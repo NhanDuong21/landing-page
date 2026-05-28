@@ -1,8 +1,7 @@
 import { Search, Play, Calendar, MapPin } from 'lucide-react';
 
 export default function Hero() {
-  // Biến môi trường này giúp tự thêm '/lora-film/' khi deploy hoặc '/' khi chạy dev
-  const videoSource = `${import.meta.env.BASE_URL}hero-video.mp4`;
+  const videoSource = 'https://res.cloudinary.com/dqc4hufot/video/upload/v1779938384/hero-video_jdj5jm.mp4';
 
   return (
     <section className="relative min-h-[90vh] md:min-h-screen flex flex-col justify-between pt-24 pb-12 px-6 md:px-12 overflow-hidden bg-brand-dark">
