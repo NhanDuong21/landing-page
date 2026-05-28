@@ -1,7 +1,7 @@
 import { Search, Play, Calendar, MapPin } from 'lucide-react';
 
 export default function Hero() {
-  const videoSource = 'https://res.cloudinary.com/dqc4hufot/video/upload/v1779938384/hero-video_jdj5jm.mp4';
+  const videoSource = 'https://res.cloudinary.com/dqc4hufot/video/upload/hero-video_zdtmvm.mp4?_s=vp-3.7.2';
 
   return (
     <section className="relative min-h-[90vh] md:min-h-screen flex flex-col justify-between pt-24 pb-12 px-6 md:px-12 overflow-hidden bg-brand-dark">
