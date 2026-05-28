@@ -1,26 +1,28 @@
 import { Search, Play, Calendar, MapPin } from 'lucide-react';
+// VỊ TRÍ 1: Thêm dòng import video này vào ngay dưới các dòng import icon
+import heroVideo from '../assets/hero-video.mp4';
 
 export default function Hero() {
-  // Thay thế link này bằng link clip trailer phim của bạn nếu có
-  const videoSource = 'src/assets/hero-video.mp4';
+  // VỊ TRÍ 2: Sửa chuỗi tĩnh thành biến vừa import ở trên
+  const videoSource = heroVideo;
 
   return (
     <section className="relative min-h-[90vh] md:min-h-screen flex flex-col justify-between pt-24 pb-12 px-6 md:px-12 overflow-hidden bg-brand-dark">
       
       {/* Background Video Implementation */}
-<div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
-  <video
-    autoPlay
-    loop
-    muted
-    playsInline
-    className="w-full h-full object-cover scale-105 opacity-75 transition-all duration-700" // Tăng opacity lên 75% để video sáng rõ hơn, bỏ filter blur gốc
-    src={videoSource}
-  />
-</div>
+      <div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover scale-105 opacity-75 transition-all duration-700" 
+          src={videoSource}
+        />
+      </div>
 
-{/* Lớp phủ Gradient mỏng và trong suốt hơn để giữ độ sáng cho video */}
-<div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/20 to-brand-dark/40 z-10 backdrop-blur-[1px]"></div>
+      {/* Lớp phủ Gradient mỏng và trong suốt hơn để giữ độ sáng cho video */}
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/20 to-brand-dark/40 z-10 backdrop-blur-[1px]"></div>
 
       {/* Main Left Content Area */}
       <div className="relative z-20 max-w-4xl mt-auto mb-8 animate-in fade-in slide-in-from-bottom duration-1000">
