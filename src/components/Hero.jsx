@@ -1,10 +1,8 @@
 import { Search, Play, Calendar, MapPin } from 'lucide-react';
-// VỊ TRÍ 1: Thêm dòng import video này vào ngay dưới các dòng import icon
-import heroVideo from '../assets/hero-video.mp4';
 
 export default function Hero() {
-  // VỊ TRÍ 2: Sửa chuỗi tĩnh thành biến vừa import ở trên
-  const videoSource = heroVideo;
+  // Biến môi trường này giúp tự thêm '/lora-film/' khi deploy hoặc '/' khi chạy dev
+  const videoSource = `${import.meta.env.BASE_URL}hero-video.mp4`;
 
   return (
     <section className="relative min-h-[90vh] md:min-h-screen flex flex-col justify-between pt-24 pb-12 px-6 md:px-12 overflow-hidden bg-brand-dark">
