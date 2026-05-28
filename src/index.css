@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-dark text-white font-sans antialiased overflow-x-hidden;
+    background-color: #111111;
+  }
+}
+
+/* Custom Scrollbar for sleek cinematic appearance */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2A2A2F;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D88174;
+}
+
+/* Premium shadows & animations */
+.target-shadow {
+  box-shadow: 0 10px 30px -10px rgba(216, 129, 116, 0.15);
+}
+
+.target-shadow:hover {
+  box-shadow: 0 15px 40px -5px rgba(216, 129, 116, 0.3);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 40%, #D88174 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Smooth transiton classes */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
