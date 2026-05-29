@@ -1,7 +1,7 @@
 import { Star, Clock } from 'lucide-react';
-import { movies } from '../data/mockData';
+import { MOVIES } from '../data/mockData';
 
-export default function MovieGrid() {
+export default function MovieGrid({ onSelectMovie }) {
   return (
     <section id="phim" className="relative px-6 md:px-12 py-16 bg-brand-dark">
       {/* Grid Header */}
@@ -26,9 +26,10 @@ export default function MovieGrid() {
 
       {/* Grid System */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {movies.map((movie, index) => (
+        {MOVIES.map((movie, index) => (
           <div
             key={movie.id}
+            onClick={() => onSelectMovie && onSelectMovie(movie.id)}
             className="bg-brand-gray rounded-xl overflow-hidden relative group cursor-pointer transition-all duration-300 hover:-translate-y-2 target-shadow flex flex-col border border-white/5"
           >
             {/* Image Wrapper */}
@@ -38,6 +39,10 @@ export default function MovieGrid() {
                 alt={movie.title}
                 className="group-hover:scale-105 transition-transform duration-500 object-cover w-full h-full"
                 loading="lazy"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80';
+                }}
               />
 
               {/* Top-Left: Massive semi-transparent index number */}
@@ -55,7 +60,13 @@ export default function MovieGrid() {
               <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
               {/* Hover Action State Button */}
-              <button className="bg-brand-coral hover:bg-opacity-90 text-white text-[10px] md:text-xs font-bold py-2.5 w-11/12 rounded absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 shadow-lg shadow-brand-coral/30">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Avoid double triggering click
+                  if (onSelectMovie) onSelectMovie(movie.id);
+                }}
+                className="bg-brand-coral hover:bg-opacity-90 text-white text-[10px] md:text-xs font-bold py-2.5 w-11/12 rounded absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 shadow-lg shadow-brand-coral/30"
+              >
                 MUA VE / BOOK NOW
               </button>
             </div>
