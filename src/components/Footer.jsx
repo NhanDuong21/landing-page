@@ -24,7 +24,7 @@ export default function Footer() {
       {/* Center Section: Social Media Icon Row */}
       <div className="flex items-center gap-4">
         <a
-          href="https://facebook.com"
+          href="https://www.facebook.com/nyanprofile"
           target="_blank"
           rel="noopener noreferrer"
           className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-brand-coral transition-all duration-300"
@@ -33,7 +33,7 @@ export default function Footer() {
           <Facebook className="w-4 h-4" />
         </a>
         <a
-          href="https://instagram.com"
+          href="https://www.instagram.com/nhannnduong1211/"
           target="_blank"
           rel="noopener noreferrer"
           className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-brand-coral transition-all duration-300"
@@ -52,7 +52,7 @@ export default function Footer() {
         </a>
         {/* TikTok SVG Icon */}
         <a
-          href="https://tiktok.com"
+          href="https://www.tiktok.com/@linggxuan"
           target="_blank"
           rel="noopener noreferrer"
           className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-brand-coral transition-all duration-300"
@@ -69,12 +69,7 @@ export default function Footer() {
       </div>
 
       {/* Right Section: Built-with Micro-badge */}
-      <div>
-        <div className="text-xs bg-brand-gray px-3.5 py-2 rounded-xl border border-white/5 flex items-center gap-1.5 text-gray-400 shadow-md">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-coral"></span>
-          Built by React Vite & Tailwind
-        </div>
-      </div>
+     
 
     </footer>
   );
