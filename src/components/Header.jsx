@@ -1,21 +1,52 @@
 import { useState } from 'react';
-import { Film, ChevronDown, User, Menu, X } from 'lucide-react';
+import { Film, ChevronDown, Menu, X, Bell } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function Header() {
+export default function Header({ onNavigate }) {
+  const { user, userRole, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState('VIE');
 
-  const menuItems = [
+  const handleLogoClick = (e) => {
+    e.preventDefault();
+    onNavigate('home');
+  };
+
+  const handleLogoutClick = () => {
+    logout();
+    setProfileDropdownOpen(false);
+    onNavigate('home');
+  };
+
+  const handleAdminViewClick = () => {
+    setProfileDropdownOpen(false);
+    onNavigate('admin');
+  };
+
+  // Determine menu items based on role
+  const isPrivileged = ['ADMIN', 'EMPLOYEE'].includes(userRole);
+  
+  const guestCustomerMenus = [
     { name: 'Phim', href: '#phim' },
-    { name: 'Rap', href: '#rap' },
-    { name: 'Suat chieu', href: '#suat-chieu' }
+    { name: 'Rạp', href: '#rap' },
+    { name: 'Suất chiếu', href: '#suat-chieu' }
   ];
 
+  const adminMenus = [
+    { name: 'Tổng Quan', action: () => onNavigate('admin') },
+    { name: 'Quản Lý Lịch Chiếu', action: () => onNavigate('admin') },
+    { name: 'Duyệt Đặt Vé', action: () => onNavigate('admin') },
+    { name: 'Hệ Thống Rạp', action: () => onNavigate('admin') }
+  ];
+
+  const currentMenus = isPrivileged ? adminMenus : guestCustomerMenus;
+
   return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-brand-dark/90 backdrop-blur-md px-6 md:px-12 py-4 flex justify-between items-center border-b border-white/5 smooth-transition">
+    <header className="fixed top-0 left-0 w-full z-50 bg-brand-dark/95 backdrop-blur-md px-6 md:px-12 py-4 flex justify-between items-center border-b border-white/5 smooth-transition">
       {/* Left Section: Logo */}
-      <a href="/" className="flex items-center gap-2.5 group">
+      <a href="/" onClick={handleLogoClick} className="flex items-center gap-2.5 group">
         <div className="bg-brand-coral/10 p-2 rounded-xl group-hover:bg-brand-coral/20 transition-all duration-300">
           <Film className="w-6 h-6 text-brand-coral" />
         </div>
@@ -27,25 +58,42 @@ export default function Header() {
 
       {/* Center Section: Navigation Links */}
       <nav className="hidden md:flex items-center gap-8 font-medium">
-        {menuItems.map((item) => (
-          <a
-            key={item.name}
-            href={item.href}
-            className="text-gray-400 hover:text-brand-coral transition-colors duration-300 relative py-2 group text-sm uppercase tracking-wider"
-          >
-            {item.name}
-            <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-coral transition-all duration-300 group-hover:w-full"></span>
-          </a>
-        ))}
+        {currentMenus.map((item, idx) => {
+          if (item.action) {
+            return (
+              <button
+                key={idx}
+                onClick={item.action}
+                className="text-gray-400 hover:text-brand-coral transition-colors duration-300 relative py-2 group text-sm uppercase tracking-wider font-semibold focus:outline-none"
+              >
+                {item.name}
+                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-coral transition-all duration-300 group-hover:w-full"></span>
+              </button>
+            );
+          }
+          return (
+            <a
+              key={idx}
+              href={item.href}
+              className="text-gray-400 hover:text-brand-coral transition-colors duration-300 relative py-2 group text-sm uppercase tracking-wider font-semibold"
+            >
+              {item.name}
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-coral transition-all duration-300 group-hover:w-full"></span>
+            </a>
+          );
+        })}
       </nav>
 
-      {/* Right Section: Language & Profile */}
+      {/* Right Section: Language & Authentication */}
       <div className="flex items-center gap-4 md:gap-6">
         {/* Language Selector */}
         <div className="relative">
           <button
-            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            className="text-white flex items-center gap-2 text-sm font-semibold hover:text-brand-coral transition-colors py-1.5 px-3 rounded-lg hover:bg-white/5"
+            onClick={() => {
+              setLangDropdownOpen(!langDropdownOpen);
+              setProfileDropdownOpen(false);
+            }}
+            className="text-white flex items-center gap-2 text-sm font-semibold hover:text-brand-coral transition-colors py-1.5 px-3 rounded-lg hover:bg-white/5 focus:outline-none"
           >
             <div className="flex items-center gap-1.5">
               {/* Vietnam Flag Badge */}
@@ -54,9 +102,9 @@ export default function Header() {
                   <div className="w-1.5 h-1.5 bg-yellow-400 clip-star" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}></div>
                 </div>
               </div>
-              <span className="tracking-wide">{currentLang}</span>
+              <span className="tracking-wide text-xs">{currentLang}</span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${langDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${langDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Lang Dropdown */}
@@ -94,10 +142,86 @@ export default function Header() {
           )}
         </div>
 
-        {/* User Profile */}
-        <button className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-brand-coral/20 text-white hover:text-brand-coral transition-all duration-300" aria-label="User Profile">
-          <User className="w-5 h-5" />
-        </button>
+        {/* Auth adaptive controls */}
+        {isAuthenticated ? (
+          <div className="flex items-center gap-4 relative">
+            {/* Notification Bell (Only for Customer role) */}
+            {userRole === 'CUSTOMER' && (
+              <button className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all">
+                <Bell className="w-4.5 h-4.5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-brand-coral rounded-full"></span>
+              </button>
+            )}
+
+            {/* Profile Avatar Button */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setProfileDropdownOpen(!profileDropdownOpen);
+                  setLangDropdownOpen(false);
+                }}
+                className="w-9 h-9 rounded-full bg-brand-coral/20 border border-brand-coral flex items-center justify-center text-brand-coral hover:bg-brand-coral/30 transition-all font-black text-sm uppercase focus:outline-none"
+              >
+                {user?.fullName ? user.fullName.charAt(0) : 'U'}
+              </button>
+
+              {/* Profile Dropdown */}
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-3 w-56 bg-brand-gray border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
+                  <div className="px-4 py-2 border-b border-white/5 mb-1">
+                    <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">Tài khoản</p>
+                    <p className="text-sm font-bold text-white truncate">{user?.fullName}</p>
+                    <p className="text-[10px] text-brand-coral font-semibold uppercase">{userRole}</p>
+                  </div>
+
+                  {userRole === 'CUSTOMER' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          alert('Chức năng hồ sơ cá nhân đang phát triển!');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
+                      >
+                        Hồ sơ cá nhân
+                      </button>
+                      <button
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          alert('Chức năng xem lịch sử đặt vé đang phát triển!');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
+                      >
+                        Lịch sử đặt vé
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleAdminViewClick}
+                      className="w-full text-left px-4 py-2.5 text-xs text-brand-yellow hover:bg-white/5 hover:text-white font-bold"
+                    >
+                      Vào Trang Quản Trị
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleLogoutClick}
+                    className="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-red-950/20 hover:text-red-300 font-bold border-t border-white/5 mt-1"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => onNavigate('login')}
+            className="bg-brand-coral hover:bg-opacity-90 text-white text-xs font-black py-2.5 px-5 rounded-full transition-all duration-300 shadow-lg shadow-brand-coral/20 uppercase tracking-wider"
+          >
+            Đăng Nhập
+          </button>
+        )}
 
         {/* Mobile Menu Button */}
         <button
@@ -112,16 +236,32 @@ export default function Header() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="absolute top-[73px] left-0 w-full bg-brand-dark/95 border-b border-white/10 px-6 py-6 flex flex-col gap-4 md:hidden z-40 animate-in slide-in-from-top duration-300">
-          {menuItems.map((item) => (
-            <a
-              key={item.name}
-              href={item.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-gray-300 hover:text-brand-coral py-2 text-base font-semibold border-b border-white/5"
-            >
-              {item.name}
-            </a>
-          ))}
+          {currentMenus.map((item, idx) => {
+            if (item.action) {
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    item.action();
+                  }}
+                  className="text-left text-gray-300 hover:text-brand-coral py-2 text-base font-semibold border-b border-white/5 w-full uppercase"
+                >
+                  {item.name}
+                </button>
+              );
+            }
+            return (
+              <a
+                key={idx}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-300 hover:text-brand-coral py-2 text-base font-semibold border-b border-white/5 uppercase"
+              >
+                {item.name}
+              </a>
+            );
+          })}
         </div>
       )}
     </header>

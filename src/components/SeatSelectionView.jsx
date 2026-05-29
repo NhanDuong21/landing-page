@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ArrowLeft, CheckCircle, Info } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
@@ -9,8 +10,10 @@ const SEAT_PRICES = {
   couple: 220000
 };
 
-export default function SeatSelectionView({ bookingData, onBack }) {
-  const [selectedSeats, setSelectedSeats] = useState([]);
+export default function SeatSelectionView({ bookingData, onBack, onRequireLogin }) {
+  const { isAuthenticated } = useAuth();
+  // Support restoring selected seats after dynamic redirection authentication
+  const [selectedSeats, setSelectedSeats] = useState(bookingData.selectedSeats || []);
   const [toastMessage, setToastMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -79,6 +82,25 @@ export default function SeatSelectionView({ bookingData, onBack }) {
     return val.toLocaleString('vi-VN') + 'đ';
   };
 
+  const handleCheckoutSubmit = () => {
+    if (selectedSeats.length === 0) return;
+
+    if (!isAuthenticated) {
+      // Trigger login redirect and cache selections
+      if (onRequireLogin) {
+        onRequireLogin({
+          bookingData: {
+            ...bookingData,
+            selectedSeats // attach current selected seats state
+          }
+        });
+      }
+      return;
+    }
+
+    setShowSuccessModal(true);
+  };
+
   return (
     <div className="bg-zinc-950 text-zinc-100 min-h-screen py-10 px-6 md:px-12 flex flex-col justify-between">
       {/* Top Breadcrumb Header Strip */}
@@ -131,7 +153,7 @@ export default function SeatSelectionView({ bookingData, onBack }) {
           <span className="text-zinc-500 text-[10px] md:text-xs tracking-[0.4em] font-black uppercase">MÀN HÌNH CHÍNH / MAIN SCREEN</span>
         </div>
 
-        {/* Architectural Seating Grid (Responsive container with scroll support) */}
+        {/* Architectural Seating Grid */}
         <div className="w-full overflow-x-auto py-4 scrollbar-thin scrollbar-thumb-zinc-800">
           <div className="min-w-[620px] max-w-2xl mx-auto px-4">
             <div className="space-y-3">
@@ -225,7 +247,7 @@ export default function SeatSelectionView({ bookingData, onBack }) {
         </div>
       </div>
 
-      {/* Bottom Subtotal Checkout Panel (Sticky look) */}
+      {/* Bottom Subtotal Checkout Panel */}
       <div className="max-w-6xl w-full mx-auto mt-10">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-center justify-between gap-6">
           <div className="w-full lg:w-auto text-center lg:text-left">
@@ -256,7 +278,7 @@ export default function SeatSelectionView({ bookingData, onBack }) {
 
             <button
               disabled={selectedSeats.length === 0}
-              onClick={() => setShowSuccessModal(true)}
+              onClick={handleCheckoutSubmit}
               className={`w-full sm:w-auto px-8 py-4 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg transition-all duration-300 transform ${
                 selectedSeats.length > 0
                   ? 'bg-brand-coral hover:bg-opacity-90 text-white cursor-pointer hover:scale-105 shadow-brand-coral/20'
@@ -273,7 +295,6 @@ export default function SeatSelectionView({ bookingData, onBack }) {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden animate-in zoom-in duration-300">
-            {/* Ambient coral glow */}
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-brand-coral/10 rounded-full filter blur-3xl pointer-events-none"></div>
 
             <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
