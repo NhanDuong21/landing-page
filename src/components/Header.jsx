@@ -22,26 +22,31 @@ export default function Header({ onNavigate }) {
 
   const handleAdminViewClick = () => {
     setProfileDropdownOpen(false);
-    onNavigate('admin');
+    if (userRole === 'ADMIN') {
+      onNavigate('admin');
+    } else if (userRole === 'EMPLOYEE') {
+      onNavigate('employee');
+    }
   };
 
   // Determine menu items based on role
-  const isPrivileged = ['ADMIN', 'EMPLOYEE'].includes(userRole);
-  
-  const guestCustomerMenus = [
+  let currentMenus = [
     { name: 'Phim', href: '#phim' },
     { name: 'Rạp', href: '#rap' },
     { name: 'Suất chiếu', href: '#suat-chieu' }
   ];
 
-  const adminMenus = [
-    { name: 'Tổng Quan', action: () => onNavigate('admin') },
-    { name: 'Quản Lý Lịch Chiếu', action: () => onNavigate('admin') },
-    { name: 'Duyệt Đặt Vé', action: () => onNavigate('admin') },
-    { name: 'Hệ Thống Rạp', action: () => onNavigate('admin') }
-  ];
-
-  const currentMenus = isPrivileged ? adminMenus : guestCustomerMenus;
+  if (userRole === 'ADMIN') {
+    currentMenus = [
+      { name: 'Trang Chủ', action: () => onNavigate('home') },
+      { name: 'Trang Quản Trị', action: () => onNavigate('admin') }
+    ];
+  } else if (userRole === 'EMPLOYEE') {
+    currentMenus = [
+      { name: 'Trang Chủ', action: () => onNavigate('home') },
+      { name: 'Trang Nhân Viên', action: () => onNavigate('employee') }
+    ];
+  }
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-brand-dark/95 backdrop-blur-md px-6 md:px-12 py-4 flex justify-between items-center border-b border-white/5 smooth-transition">
@@ -200,7 +205,7 @@ export default function Header({ onNavigate }) {
                       onClick={handleAdminViewClick}
                       className="w-full text-left px-4 py-2.5 text-xs text-brand-yellow hover:bg-white/5 hover:text-white font-bold"
                     >
-                      Vào Trang Quản Trị
+                      {userRole === 'ADMIN' ? 'Vào Trang Quản Trị' : 'Vào Trang Nhân Viên'}
                     </button>
                   )}
 
