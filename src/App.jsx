@@ -104,6 +104,15 @@ function AppInner() {
               setPendingBooking(payload);
               handleViewChange({ name: 'login', data: null });
             }}
+            onUpdateBookingData={(newData) => {
+              setCurrentView((prev) => ({
+                ...prev,
+                data: {
+                  ...prev.data,
+                  ...newData
+                }
+              }));
+            }}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, Info, ShoppingBag, Clock, CreditCard, Smartphone, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Info, ShoppingBag, Clock, CreditCard, Smartphone, AlertTriangle, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { MOVIES } from '../data/mockData';
+import { MOVIES, SHOWTIMES } from '../data/mockData';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
@@ -35,7 +35,7 @@ const CONCESSIONS = [
   }
 ];
 
-export default function SeatSelectionView({ bookingData, onBack, onRequireLogin }) {
+export default function SeatSelectionView({ bookingData, onBack, onRequireLogin, onUpdateBookingData }) {
   const { isAuthenticated, user } = useAuth();
   
   // Support restoring selected seats after dynamic redirection authentication
@@ -298,20 +298,14 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
       <div className="max-w-7xl mx-auto w-full">
         {/* Floating countdown banner */}
         {timerActive && (
-          <div className={`border rounded-2xl p-4 flex items-center justify-between gap-4 animate-pulse mb-6 ${
-            timerSeconds < 120 
-              ? 'bg-red-950/80 border-red-500/30 text-red-400' 
-              : 'bg-amber-950/80 border-amber-500/30 text-amber-400'
-          }`}>
+          <div className="border border-amber-500/20 bg-amber-955/30 rounded-2xl p-4 flex items-center justify-between gap-4 animate-pulse mb-6 text-amber-500">
             <div className="flex items-center gap-3">
-              <Clock className={`w-5 h-5 shrink-0 ${timerSeconds < 120 ? 'text-red-500' : 'text-amber-500'}`} />
+              <Clock className="w-5 h-5 shrink-0 text-amber-500" />
               <span className="text-xs md:text-sm font-semibold">
                 Ghế của bạn đang được giữ, vui lòng hoàn tất đặt vé trong
               </span>
             </div>
-            <span className={`text-sm md:text-base font-black bg-zinc-950 px-3 py-1.5 rounded-xl border ${
-              timerSeconds < 120 ? 'text-red-500 border-red-500/20' : 'text-amber-500 border-amber-500/20'
-            }`}>
+            <span className="text-sm md:text-base font-black bg-zinc-950 px-3 py-1.5 rounded-xl border border-amber-500/20 text-amber-500">
               {formatTime(timerSeconds)}
             </span>
           </div>
@@ -386,6 +380,40 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
             {/* Step 1: Seat selection grid & Legend Map */}
             {currentStep === 1 && (
               <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col justify-center relative overflow-hidden">
+                
+                {/* QUICK SHOWTIME CHANGER WIDGET */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-2xl p-4 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                    <Calendar className="w-4 h-4 text-brand-coral shrink-0" />
+                    <span>Đổi suất chiếu nhanh:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {SHOWTIMES.map((t) => {
+                      const isActive = t === time;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            if (t === time) return;
+                            setSelectedSeats([]);
+                            if (onUpdateBookingData) {
+                              onUpdateBookingData({ time: t });
+                            }
+                          }}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all duration-300 ${
+                            isActive
+                              ? 'bg-brand-coral border-brand-coral text-white shadow-md shadow-brand-coral/25'
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* The Silver Screen Curve */}
                 <div className="w-full max-w-lg mx-auto mb-16 text-center">
                   <div className="h-1.5 bg-gradient-to-r from-transparent via-brand-coral to-transparent shadow-[0_0_20px_rgba(216,129,116,0.9)] rounded-full mb-2"></div>
