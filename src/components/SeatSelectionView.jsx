@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ArrowLeft, CheckCircle, Info, ShoppingBag } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { ArrowLeft, CheckCircle, Info, ShoppingBag, Clock, CreditCard, Smartphone, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { MOVIES } from '../data/mockData';
 
@@ -37,13 +37,84 @@ const CONCESSIONS = [
 
 export default function SeatSelectionView({ bookingData, onBack, onRequireLogin }) {
   const { isAuthenticated, user } = useAuth();
+  
   // Support restoring selected seats after dynamic redirection authentication
   const [selectedSeats, setSelectedSeats] = useState(bookingData.selectedSeats || []);
   const [selectedConcessions, setSelectedConcessions] = useState({});
   const [toastMessage, setToastMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [timerSeconds, setTimerSeconds] = useState(600);
+  const [timerActive, setTimerActive] = useState(false);
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('domestic');
 
   const { movieTitle, date, cinema, time, format, movieId } = bookingData;
+
+  // Intercept GUEST immediately if they try to access seats
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (onRequireLogin) {
+        onRequireLogin({
+          bookingData: {
+            ...bookingData,
+            selectedSeats
+          }
+        });
+      }
+    }
+  }, [isAuthenticated, onRequireLogin, bookingData, selectedSeats]);
+
+  // Timer Countdown Effect
+  useEffect(() => {
+    if (!timerActive) return;
+
+    const interval = setInterval(() => {
+      setTimerSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setShowTimeoutModal(true);
+          setTimerActive(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerActive]);
+
+  const handleTimeoutOk = () => {
+    setShowTimeoutModal(false);
+    setSelectedSeats([]);
+    setSelectedConcessions({});
+    setTimerSeconds(600);
+    setTimerActive(false);
+    localStorage.removeItem('lora_pending_booking');
+    onBack(); // route back to home
+  };
+
+  const handleProceedToConcessions = () => {
+    if (selectedSeats.length === 0) return;
+    setTimerActive(true);
+    setCurrentStep(2);
+  };
+
+  const handleProceedToPayment = () => {
+    setCurrentStep(3);
+  };
+
+  const handleHeaderBack = () => {
+    if (currentStep === 1) {
+      onBack();
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+      setTimerActive(false);
+      setTimerSeconds(600);
+    } else if (currentStep === 3) {
+      setCurrentStep(2);
+    }
+  };
 
   const movie = useMemo(() => {
     return MOVIES.find((m) => m.id === movieId) || {
@@ -154,16 +225,21 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
     return val.toLocaleString('vi-VN') + 'đ';
   };
 
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const handleCheckoutSubmit = () => {
     if (selectedSeats.length === 0) return;
 
     if (!isAuthenticated) {
-      // Trigger login redirect and cache selections
       if (onRequireLogin) {
         onRequireLogin({
           bookingData: {
             ...bookingData,
-            selectedSeats // attach current selected seats state
+            selectedSeats
           }
         });
       }
@@ -193,6 +269,7 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
       concessions: concessionItems,
       totalAmount: totalAmount,
       status: 'CHUA_KIEM_TRA',
+      paymentMethod: paymentMethod === 'lorapay' ? 'Ví điện tử LoraPay' : 'Thẻ nội địa ATM',
       timestamp: new Date().toISOString()
     };
 
@@ -201,6 +278,9 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
     const ticketList = savedTickets ? JSON.parse(savedTickets) : [];
     ticketList.push(newTicket);
     localStorage.setItem('lora_tickets', JSON.stringify(ticketList));
+
+    // Reset timer
+    setTimerActive(false);
 
     setShowSuccessModal(true);
   };
@@ -216,20 +296,41 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
       )}
 
       <div className="max-w-7xl mx-auto w-full">
+        {/* Floating countdown banner */}
+        {timerActive && (
+          <div className={`border rounded-2xl p-4 flex items-center justify-between gap-4 animate-pulse mb-6 ${
+            timerSeconds < 120 
+              ? 'bg-red-950/80 border-red-500/30 text-red-400' 
+              : 'bg-amber-950/80 border-amber-500/30 text-amber-400'
+          }`}>
+            <div className="flex items-center gap-3">
+              <Clock className={`w-5 h-5 shrink-0 ${timerSeconds < 120 ? 'text-red-500' : 'text-amber-500'}`} />
+              <span className="text-xs md:text-sm font-semibold">
+                Ghế của bạn đang được giữ, vui lòng hoàn tất đặt vé trong
+              </span>
+            </div>
+            <span className={`text-sm md:text-base font-black bg-zinc-950 px-3 py-1.5 rounded-xl border ${
+              timerSeconds < 120 ? 'text-red-500 border-red-500/20' : 'text-amber-500 border-amber-500/20'
+            }`}>
+              {formatTime(timerSeconds)}
+            </span>
+          </div>
+        )}
+
         {/* Main Grid Wrapper */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           
-          {/* LEFT MAIN PANEL (Screen, Seats Matrix & Concessions Module) */}
+          {/* LEFT MAIN PANEL (Funnel Flow Steps Container) */}
           <div className="lg:col-span-2 space-y-8">
             
             {/* Header Strip with Back link */}
             <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <button
-                onClick={onBack}
+                onClick={handleHeaderBack}
                 className="flex items-center gap-2 text-zinc-400 hover:text-brand-coral transition-colors text-sm font-semibold self-start sm:self-auto"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Quay lại phim</span>
+                <span>{currentStep === 1 ? 'Quay lại phim' : 'Quay lại bước trước'}</span>
               </button>
               
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-400">
@@ -248,161 +349,271 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
               </div>
             </div>
 
-            {/* Screening Area */}
-            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col justify-center relative overflow-hidden">
-              {/* The Silver Screen Curve */}
-              <div className="w-full max-w-lg mx-auto mb-16 text-center">
-                <div className="h-1.5 bg-gradient-to-r from-transparent via-brand-coral to-transparent shadow-[0_0_20px_rgba(216,129,116,0.9)] rounded-full mb-2"></div>
-                <span className="text-zinc-500 text-[10px] tracking-[0.4em] font-black uppercase">MÀN HÌNH CHÍNH / MAIN SCREEN</span>
+            {/* Step Indicator Bar */}
+            <div className="flex items-center justify-between max-w-md mx-auto mb-8 bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
+                  currentStep >= 1 ? 'bg-brand-coral text-white' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  1
+                </div>
+                <span className={`text-[11px] font-bold ${currentStep >= 1 ? 'text-white' : 'text-zinc-500'}`}>Chọn Ghế</span>
+              </div>
+              
+              <div className="h-[2px] w-8 bg-zinc-800 flex-grow mx-3"></div>
+
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
+                  currentStep >= 2 ? 'bg-brand-coral text-white' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  2
+                </div>
+                <span className={`text-[11px] font-bold ${currentStep >= 2 ? 'text-white' : 'text-zinc-500'}`}>Bắp Nước</span>
               </div>
 
-              {/* Architectural Seating Grid */}
-              <div className="w-full overflow-x-auto py-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                <div className="min-w-[620px] max-w-2xl mx-auto px-4">
-                  <div className="space-y-3">
-                    {ROWS.map((row) => {
-                      const isCoupleRow = row === 'J';
-                      const seatCount = isCoupleRow ? 6 : 12;
+              <div className="h-[2px] w-8 bg-zinc-800 flex-grow mx-3"></div>
 
-                      return (
-                        <div key={row} className="flex items-center gap-3">
-                          {/* Row Label Left */}
-                          <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
+                  currentStep >= 3 ? 'bg-brand-coral text-white' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  3
+                </div>
+                <span className={`text-[11px] font-bold ${currentStep >= 3 ? 'text-white' : 'text-zinc-500'}`}>Thanh Toán</span>
+              </div>
+            </div>
 
-                          {/* Seats Row Grid */}
-                          <div className="flex-grow grid grid-cols-12 gap-2">
-                            {Array.from({ length: seatCount }).map((_, idx) => {
-                              const colNumber = idx + 1;
-                              const label = `${row}${colNumber}`;
-                              const isOccupied = occupiedSeats.has(label);
-                              const isSelected = selectedSeats.includes(label);
-                              
-                              let seatClass;
-                              let textLabel = label;
+            {/* Step 1: Seat selection grid & Legend Map */}
+            {currentStep === 1 && (
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col justify-center relative overflow-hidden">
+                {/* The Silver Screen Curve */}
+                <div className="w-full max-w-lg mx-auto mb-16 text-center">
+                  <div className="h-1.5 bg-gradient-to-r from-transparent via-brand-coral to-transparent shadow-[0_0_20px_rgba(216,129,116,0.9)] rounded-full mb-2"></div>
+                  <span className="text-zinc-500 text-[10px] tracking-[0.4em] font-black uppercase">MÀN HÌNH CHÍNH / MAIN SCREEN</span>
+                </div>
 
-                              if (isOccupied) {
-                                seatClass = 'bg-zinc-950 border border-zinc-900 text-zinc-700 line-through opacity-30 cursor-not-allowed pointer-events-none';
-                              } else if (isSelected) {
-                                seatClass = 'bg-emerald-500 border-emerald-400 text-black font-extrabold shadow-lg shadow-emerald-500/20';
-                              } else {
-                                // Type styling
-                                if (isCoupleRow) {
-                                  seatClass = 'bg-rose-600/10 border border-rose-500/40 hover:bg-rose-500/30 text-rose-400';
-                                } else if (['F', 'G', 'H', 'I'].includes(row)) {
-                                  seatClass = 'bg-amber-600/10 border border-amber-500/40 hover:bg-amber-500/30 text-amber-400';
+                {/* Architectural Seating Grid */}
+                <div className="w-full overflow-x-auto py-4 scrollbar-thin scrollbar-thumb-zinc-800">
+                  <div className="min-w-[620px] max-w-2xl mx-auto px-4">
+                    <div className="space-y-3">
+                      {ROWS.map((row) => {
+                        const isCoupleRow = row === 'J';
+                        const seatCount = isCoupleRow ? 6 : 12;
+
+                        return (
+                          <div key={row} className="flex items-center gap-3">
+                            {/* Row Label Left */}
+                            <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
+
+                            {/* Seats Row Grid */}
+                            <div className="flex-grow grid grid-cols-12 gap-2">
+                              {Array.from({ length: seatCount }).map((_, idx) => {
+                                const colNumber = idx + 1;
+                                const label = `${row}${colNumber}`;
+                                const isOccupied = occupiedSeats.has(label);
+                                const isSelected = selectedSeats.includes(label);
+                                
+                                let seatClass;
+                                let textLabel = label;
+
+                                if (isOccupied) {
+                                  seatClass = 'bg-zinc-950 border border-zinc-900 text-zinc-700 line-through opacity-30 cursor-not-allowed pointer-events-none';
+                                } else if (isSelected) {
+                                  seatClass = 'bg-emerald-500 border-emerald-400 text-black font-extrabold shadow-lg shadow-emerald-500/20';
                                 } else {
-                                  seatClass = 'bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-400';
+                                  // Type styling
+                                  if (isCoupleRow) {
+                                    seatClass = 'bg-rose-600/10 border border-rose-500/40 hover:bg-rose-500/30 text-rose-400';
+                                  } else if (['F', 'G', 'H', 'I'].includes(row)) {
+                                    seatClass = 'bg-amber-600/10 border border-amber-500/40 hover:bg-amber-500/30 text-amber-400';
+                                  } else {
+                                    seatClass = 'bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-400';
+                                  }
                                 }
-                              }
 
-                              // Couple seat occupies double width span
-                              const colSpan = isCoupleRow ? 'col-span-2' : 'col-span-1';
+                                // Couple seat occupies double width span
+                                const colSpan = isCoupleRow ? 'col-span-2' : 'col-span-1';
 
-                              if (isCoupleRow) {
-                                textLabel = `J${colNumber * 2 - 1}-J${colNumber * 2}`;
-                              }
+                                if (isCoupleRow) {
+                                  textLabel = `J${colNumber * 2 - 1}-J${colNumber * 2}`;
+                                }
 
-                              return (
-                                <button
-                                  key={label}
-                                  disabled={isOccupied}
-                                  onClick={() => handleSeatClick(label)}
-                                  className={`${colSpan} aspect-square md:aspect-auto md:h-10 rounded-lg flex items-center justify-center text-[10px] md:text-xs font-semibold tracking-tighter transition-all duration-200 select-none ${seatClass}`}
-                                  aria-label={`Select seat ${textLabel}`}
-                                >
-                                  {textLabel}
-                                </button>
-                              );
-                            })}
+                                return (
+                                  <button
+                                    key={label}
+                                    disabled={isOccupied}
+                                    onClick={() => handleSeatClick(label)}
+                                    className={`${colSpan} aspect-square md:aspect-auto md:h-10 rounded-lg flex items-center justify-center text-[10px] md:text-xs font-semibold tracking-tighter transition-all duration-200 select-none ${seatClass}`}
+                                    aria-label={`Select seat ${textLabel}`}
+                                  >
+                                    {textLabel}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Row Label Right */}
+                            <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
                           </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-                          {/* Row Label Right */}
-                          <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
-                        </div>
-                      );
-                    })}
+                {/* Legend Map */}
+                <div className="flex flex-wrap justify-center gap-6 mt-12 text-xs text-zinc-400 border-t border-zinc-800 pt-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-zinc-800 border border-zinc-700"></div>
+                    <span>Ghế thường (80k)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-amber-600/10 border border-amber-500/40"></div>
+                    <span>Ghế VIP (110k)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-4 rounded bg-rose-600/10 border border-rose-500/40"></div>
+                    <span>Ghế Đôi (220k)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-emerald-500 border border-emerald-400"></div>
+                    <span>Đang chọn</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-zinc-950 border border-zinc-900 line-through opacity-30 flex items-center justify-center text-[8px]">X</div>
+                    <span>Đã đặt</span>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Legend Map */}
-              <div className="flex flex-wrap justify-center gap-6 mt-12 text-xs text-zinc-400 border-t border-zinc-850 pt-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-zinc-800 border border-zinc-700"></div>
-                  <span>Ghế thường (80k)</span>
+            {/* Step 2: Concession & combo snacks selection */}
+            {currentStep === 2 && (
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-6">
+                <div className="flex items-center gap-3">
+                  <ShoppingBag className="w-5 h-5 text-brand-coral" />
+                  <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-wider">MUA KÈM BẮP NƯỚC</h3>
+                    <p className="text-zinc-500 text-xs mt-0.5">Ưu đãi giảm giá combo lớn khi mua trực tuyến</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-amber-600/10 border border-amber-500/40"></div>
-                  <span>Ghế VIP (110k)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-4 rounded bg-rose-600/10 border border-rose-500/40"></div>
-                  <span>Ghế Đôi (220k)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-emerald-500 border border-emerald-400"></div>
-                  <span>Đang chọn</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-zinc-950 border border-zinc-900 line-through opacity-30 flex items-center justify-center text-[8px]">X</div>
-                  <span>Đã đặt</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Integrated Interactive Concessions Section */}
-            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-6">
-              <div className="flex items-center gap-3">
-                <ShoppingBag className="w-5 h-5 text-brand-coral" />
-                <div>
-                  <h3 className="text-base font-black text-white uppercase tracking-wider">MUA KÈM BẮP NƯỚC</h3>
-                  <p className="text-zinc-500 text-xs mt-0.5">Ưu đãi giảm giá combo lớn khi mua trực tuyến</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {CONCESSIONS.map((combo) => {
-                  const qty = selectedConcessions[combo.id] || 0;
-                  return (
-                    <div key={combo.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-zinc-700 transition-colors">
-                      <div className="aspect-video bg-zinc-950 relative overflow-hidden">
-                        <img 
-                          src={combo.image} 
-                          alt={combo.name} 
-                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <div className="p-4 flex-grow flex flex-col justify-between space-y-4">
-                        <div>
-                          <h4 className="font-bold text-white text-xs tracking-wide">{combo.name}</h4>
-                          <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">{combo.description}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {CONCESSIONS.map((combo) => {
+                    const qty = selectedConcessions[combo.id] || 0;
+                    return (
+                      <div key={combo.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-zinc-700 transition-colors">
+                        <div className="aspect-video bg-zinc-950 relative overflow-hidden">
+                          <img 
+                            src={combo.image} 
+                            alt={combo.name} 
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          />
                         </div>
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="text-xs font-black text-brand-yellow">{formatCurrency(combo.price)}</span>
-                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 rounded-lg p-1 select-none">
-                            <button
-                              type="button"
-                              onClick={() => handleDecreaseConcession(combo.id)}
-                              className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
-                            >
-                              -
-                            </button>
-                            <span className="text-xs font-black text-white w-3 text-center">{qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleIncreaseConcession(combo.id)}
-                              className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
-                            >
-                              +
-                            </button>
+                        <div className="p-4 flex-grow flex flex-col justify-between space-y-4">
+                          <div>
+                            <h4 className="font-bold text-white text-xs tracking-wide">{combo.name}</h4>
+                            <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">{combo.description}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2">
+                            <span className="text-xs font-black text-brand-yellow">{formatCurrency(combo.price)}</span>
+                            <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg p-1 select-none">
+                              <button
+                                type="button"
+                                onClick={() => handleDecreaseConcession(combo.id)}
+                                className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
+                              >
+                                -
+                              </button>
+                              <span className="text-xs font-black text-white w-3 text-center">{qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleIncreaseConcession(combo.id)}
+                                className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Step 3: Mock Payment Summary Gateway */}
+            {currentStep === 3 && (
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-6">
+                <h3 className="text-base font-black text-white uppercase tracking-wider">PHƯƠNG THỨC THANH TOÁN</h3>
+                <p className="text-zinc-500 text-xs mt-0.5">Vui lòng chọn một phương thức thanh toán giả định bên dưới</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* LoraPay Option */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('lorapay')}
+                    className={`flex items-center gap-4 p-5 rounded-2xl border text-left transition-all duration-300 ${
+                      paymentMethod === 'lorapay'
+                        ? 'bg-brand-coral/10 border-brand-coral text-white shadow-lg shadow-brand-coral/10'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    <Smartphone className={`w-8 h-8 shrink-0 ${paymentMethod === 'lorapay' ? 'text-brand-coral' : 'text-zinc-500'}`} />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-white">Ví điện tử LoraPay</h4>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Thanh toán nhanh qua ứng dụng di động</p>
+                    </div>
+                  </button>
+
+                  {/* Domestic Card Option */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('domestic')}
+                    className={`flex items-center gap-4 p-5 rounded-2xl border text-left transition-all duration-300 ${
+                      paymentMethod === 'domestic'
+                        ? 'bg-brand-coral/10 border-brand-coral text-white shadow-lg shadow-brand-coral/10'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    <CreditCard className={`w-8 h-8 shrink-0 ${paymentMethod === 'domestic' ? 'text-brand-coral' : 'text-zinc-500'}`} />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-white">Thẻ nội địa</h4>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">ATM / Internet Banking</p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Final Invoice Summary details */}
+                <div className="border-t border-zinc-800 pt-6 space-y-4">
+                  <h4 className="font-bold text-xs text-white uppercase tracking-wider">HÓA ĐƠN CHI TIẾT</h4>
+                  <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex justify-between text-zinc-400">
+                      <span>Giá vé ({selectedSeats.length} ghế)</span>
+                      <span className="text-white font-bold">{formatCurrency(totalSeatsPrice)}</span>
+                    </div>
+                    {totalConcessionsPrice > 0 && (
+                      <div className="flex justify-between text-zinc-400">
+                        <span>Bắp nước combo</span>
+                        <span className="text-white font-bold">{formatCurrency(totalConcessionsPrice)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-zinc-400 pt-2 border-t border-zinc-800">
+                      <span className="font-extrabold text-white">Tổng cộng</span>
+                      <span className="text-brand-coral font-black text-sm">{formatCurrency(totalAmount)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-zinc-800 pt-6 space-y-2">
+                  <h4 className="font-bold text-xs text-white uppercase tracking-wider">ĐIỀU KHOẢN GIAO DỊCH</h4>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    Bằng việc nhấn nút "Xác Nhận Đặt Vé", bạn đồng ý với các điều khoản thanh toán giả định của hệ thống LoraFilm. Vé đã mua không thể thay đổi hoặc hoàn tiền.
+                  </p>
+                </div>
+              </div>
+            )}
 
           </div>
 
@@ -482,7 +693,7 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
 
               {/* Concessions list */}
               {Object.keys(selectedConcessions).length > 0 && (
-                <div className="space-y-2 pt-3 border-t border-zinc-850">
+                <div className="space-y-2 pt-3 border-t border-zinc-800">
                   {Object.entries(selectedConcessions).map(([id, qty]) => {
                     const combo = CONCESSIONS.find(c => c.id === id);
                     if (!combo) return null;
@@ -506,17 +717,27 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
               <span className="text-lg md:text-xl font-black text-brand-coral">{formatCurrency(totalAmount)}</span>
             </div>
 
-            {/* Primary Checkout Call-to-Action */}
+            {/* Step-conditional Funnel Action Button */}
             <button
               disabled={selectedSeats.length === 0}
-              onClick={handleCheckoutSubmit}
+              onClick={() => {
+                if (currentStep === 1) {
+                  handleProceedToConcessions();
+                } else if (currentStep === 2) {
+                  handleProceedToPayment();
+                } else if (currentStep === 3) {
+                  handleCheckoutSubmit();
+                }
+              }}
               className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg transition-all duration-300 transform ${
                 selectedSeats.length > 0
                   ? 'bg-brand-coral hover:bg-opacity-95 hover:scale-[1.02] text-white shadow-brand-coral/25'
                   : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
               }`}
             >
-              Đặt Vé Ngay
+              {currentStep === 1 && 'Tiếp Tục'}
+              {currentStep === 2 && 'Tiếp Tục Thanh Toán'}
+              {currentStep === 3 && 'Xác Nhận Đặt Vé'}
             </button>
 
           </div>
@@ -584,6 +805,14 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
                 </div>
               )}
 
+              {/* Payment Method */}
+              <div className="flex justify-between border-t border-zinc-850 pt-2.5 mt-2.5">
+                <span className="text-zinc-500">Thanh toán:</span>
+                <span className="text-zinc-200 font-semibold">
+                  {paymentMethod === 'lorapay' ? 'Ví LoraPay' : 'Thẻ ATM nội địa'}
+                </span>
+              </div>
+
               <div className="border-t border-zinc-800/80 pt-2.5 mt-2.5 flex justify-between items-center">
                 <span className="text-zinc-500 font-bold">Tổng thanh toán:</span>
                 <span className="text-brand-coral font-black text-sm">{formatCurrency(totalAmount)}</span>
@@ -598,6 +827,27 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
               className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-4 rounded-xl shadow-lg transition-colors duration-300 uppercase tracking-wider text-xs"
             >
               Quay lại Trang Chủ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Timeout Expiry Modal */}
+      {showTimeoutModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden animate-in zoom-in duration-300">
+            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            
+            <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2">HẾT THỜI GIAN GIỮ GHẾ</h3>
+            <p className="text-zinc-400 text-xs mb-6 leading-relaxed">
+              Hết thời gian giữ ghế! Suất chiếu của bạn đã bị hủy tự động để giải phóng chỗ.
+            </p>
+
+            <button
+              onClick={handleTimeoutOk}
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-4 rounded-xl shadow-lg transition-colors duration-300 uppercase tracking-wider text-xs"
+            >
+              Đồng ý (OK)
             </button>
           </div>
         </div>
