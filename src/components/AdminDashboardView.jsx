@@ -35,7 +35,15 @@ export default function AdminDashboardView({ onBackHome }) {
   const { user, userRole, logout } = useAuth();
   
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Theater Clusters modal forms state
+  const [theaterModalOpen, setTheaterModalOpen] = useState(false);
+  const [theaterForm, setTheaterForm] = useState({ name: '', address: '', defaultHallsCount: 3 });
+
+  const [hallModalOpen, setHallModalOpen] = useState(false);
+  const [targetTheaterIdForHall, setTargetTheaterIdForHall] = useState(null);
+  const [hallForm, setHallForm] = useState({ name: '', capacity: 120, format: '2D Digital' });
 
   // Collapsible sidebar section states
   const [expandedSections, setExpandedSections] = useState({
@@ -342,19 +350,73 @@ export default function AdminDashboardView({ onBackHome }) {
   };
 
   // 4. Theater Clusters & Halls triggers
-  const handleAddHall = (theaterId) => {
-    const name = prompt('Nhap ten phong chieu moi:');
-    if (!name) return;
-    const format = prompt('Nhap dinh dang phong chieu (2D Digital / IMAX 3D / 3D Digital):', '2D Digital');
-    const capacity = parseInt(prompt('Nhap suc chua cua phong:', '120')) || 120;
+  const handleOpenAddTheater = () => {
+    setTheaterForm({ name: '', address: '', defaultHallsCount: 3 });
+    setTheaterModalOpen(true);
+  };
+
+  const handleSaveTheater = (e) => {
+    e.preventDefault();
+    if (!theaterForm.name || !theaterForm.address) {
+      triggerToast('Vui long dien day du ten va dia chi cum rap!', 'error');
+      return;
+    }
+
+    const newTheaterId = Date.now();
+    const count = parseInt(theaterForm.defaultHallsCount) || 3;
+    const halls = [];
+    for (let i = 1; i <= count; i++) {
+      halls.push({
+        id: `${newTheaterId}-${i}`,
+        name: `Phong Chieu ${i}`,
+        capacity: 120,
+        format: '2D Digital'
+      });
+    }
+
+    const newTheater = {
+      id: newTheaterId,
+      name: theaterForm.name,
+      address: theaterForm.address,
+      halls
+    };
+
+    const updated = [...theaters, newTheater];
+    updateTheatersState(updated);
+    setSelectedTheaterId(newTheaterId);
+    setTheaterModalOpen(false);
+    triggerToast('Them cum rap moi thanh cong!');
+  };
+
+  const handleOpenAddHall = (theaterId) => {
+    setTargetTheaterIdForHall(theaterId);
+    setHallForm({ 
+      name: `Phong Chieu ${theaters.find(t => t.id === theaterId)?.halls.length + 1 || 1}`, 
+      capacity: 120, 
+      format: '2D Digital' 
+    });
+    setHallModalOpen(true);
+  };
+
+  const handleSaveHall = (e) => {
+    e.preventDefault();
+    if (!hallForm.name) {
+      triggerToast('Vui long nhap ten phong chieu!', 'error');
+      return;
+    }
 
     const updated = theaters.map(t => {
-      if (t.id === theaterId) {
+      if (t.id === targetTheaterIdForHall) {
         return {
           ...t,
           halls: [
             ...t.halls,
-            { id: `${t.id}-${t.halls.length + 1}`, name, capacity, format }
+            { 
+              id: `${t.id}-${t.halls.length + 1}-${Date.now()}`, 
+              name: hallForm.name, 
+              capacity: parseInt(hallForm.capacity) || 120, 
+              format: hallForm.format 
+            }
           ]
         };
       }
@@ -362,7 +424,8 @@ export default function AdminDashboardView({ onBackHome }) {
     });
 
     updateTheatersState(updated);
-    triggerToast('Da them phong chieu moi!');
+    setHallModalOpen(false);
+    triggerToast('Da them phong chieu moi thanh cong!');
   };
 
   const handleRenameHall = (theaterId, hallId) => {
@@ -381,6 +444,22 @@ export default function AdminDashboardView({ onBackHome }) {
 
     updateTheatersState(updated);
     triggerToast('Da doi ten phong chieu!');
+  };
+
+  const handleDeleteHall = (theaterId, hallId) => {
+    if (confirm('Ban co chac chan muon xoa phong chieu nay?')) {
+      const updated = theaters.map(t => {
+        if (t.id === theaterId) {
+          return {
+            ...t,
+            halls: t.halls.filter(h => h.id !== hallId)
+          };
+        }
+        return t;
+      });
+      updateTheatersState(updated);
+      triggerToast('Da xoa phong chieu!');
+    }
   };
 
   // 5. Customer promotions
@@ -488,9 +567,9 @@ export default function AdminDashboardView({ onBackHome }) {
           <nav className="p-4 space-y-2 overflow-y-auto max-h-[65vh] scrollbar-thin">
             {/* Dashboard Link */}
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => setActiveTab('dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase transition-all duration-200 ${
-                activeTab === 'overview'
+                activeTab === 'dashboard'
                   ? 'bg-brand-coral/10 text-brand-coral border-l-4 border-brand-coral'
                   : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
               }`}
@@ -681,7 +760,7 @@ export default function AdminDashboardView({ onBackHome }) {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide uppercase">
-              {activeTab === 'overview' && 'TỔNG QUAN HỆ THỐNG'}
+              {activeTab === 'dashboard' && 'TỔNG QUAN HỆ THỐNG'}
               {activeTab === 'movies' && 'DANH SÁCH PHIM'}
               {activeTab === 'actors' && 'QUẢN LÝ DIỄN VIÊN'}
               {activeTab === 'showtimes' && 'QUẢN LÝ LỊCH CHIẾU'}
@@ -702,96 +781,100 @@ export default function AdminDashboardView({ onBackHome }) {
           </div>
         </div>
 
-        {/* Operational Snapshots */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
-            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
-              <CircleDollarSign className="w-8 h-8 text-brand-coral" />
-            </div>
-            <div>
-              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
-                Doanh thu tong hop
-              </span>
-              <span className="text-2xl font-black text-white block mb-0.5">{totalRevenueVal.toLocaleString('vi-VN')}đ</span>
-              <span className="text-[10px] text-zinc-400 block font-semibold">+12.5% so voi hom qua</span>
-            </div>
-          </div>
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Operational Snapshots */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+                  <CircleDollarSign className="w-8 h-8 text-brand-coral" />
+                </div>
+                <div>
+                  <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                    Doanh thu tong hop
+                  </span>
+                  <span className="text-2xl font-black text-white block mb-0.5">{totalRevenueVal.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-[10px] text-zinc-400 block font-semibold">+12.5% so voi hom qua</span>
+                </div>
+              </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
-            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
-              <Ticket className="w-8 h-8 text-brand-yellow" />
-            </div>
-            <div>
-              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
-                Ve ban tai quay
-              </span>
-              <span className="text-2xl font-black text-white block mb-0.5">{totalTicketsVal} ve</span>
-              <span className="text-[10px] text-zinc-400 block font-semibold">{theaters.reduce((acc, t) => acc + t.halls.length, 0)} phong chieu dang hoat dong</span>
-            </div>
-          </div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+                  <Ticket className="w-8 h-8 text-brand-yellow" />
+                </div>
+                <div>
+                  <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                    Ve ban tai quay
+                  </span>
+                  <span className="text-2xl font-black text-white block mb-0.5">{totalTicketsVal} ve</span>
+                  <span className="text-[10px] text-zinc-400 block font-semibold">{theaters.reduce((acc, t) => acc + t.halls.length, 0)} phong chieu dang hoat dong</span>
+                </div>
+              </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
-            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
-              <Percent className="w-8 h-8 text-emerald-500" />
-            </div>
-            <div>
-              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
-                Ty le lap day phong
-              </span>
-              <span className="text-2xl font-black text-white block mb-0.5">84.2%</span>
-              <span className="text-[10px] text-zinc-400 block font-semibold">+4.8% trong khung gio vang</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Central Display Panels */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative min-h-[400px]">
-          
-          {/* Overview Panel */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <span>Giao dịch vé gần đây</span>
-              </h2>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-zinc-400">
-                  <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
-                    <tr>
-                      <th className="py-3 px-4">Ma ve</th>
-                      <th className="py-3 px-4">Khach hang</th>
-                      <th className="py-3 px-4">Phim</th>
-                      <th className="py-3 px-4">Suat chieu</th>
-                      <th className="py-3 px-4">Ghe</th>
-                      <th className="py-3 px-4">Tong tien</th>
-                      <th className="py-3 px-4">Trang thai</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {tickets.map(t => (
-                      <tr key={t.id}>
-                        <td className="py-3.5 px-4 font-mono text-brand-yellow font-bold">{t.id}</td>
-                        <td className="py-3.5 px-4 font-bold text-white">{t.customerName}</td>
-                        <td className="py-3.5 px-4">{t.movieTitle}</td>
-                        <td className="py-3.5 px-4 font-semibold text-brand-coral">{t.time} | {t.date}</td>
-                        <td className="py-3.5 px-4">{t.seats.join(', ')}</td>
-                        <td className="py-3.5 px-4 text-emerald-400 font-extrabold">{t.totalAmount.toLocaleString('vi-VN')}đ</td>
-                        <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
-                            t.status === 'DA_KIEM_TRA' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                              : 'bg-zinc-800 text-zinc-400 border-zinc-700/50'
-                          }`}>
-                            {t.status === 'DA_KIEM_TRA' ? 'Da kiem tra' : 'Chua check-in'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+                  <Percent className="w-8 h-8 text-emerald-500" />
+                </div>
+                <div>
+                  <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                    Ty le lap day phong
+                  </span>
+                  <span className="text-2xl font-black text-white block mb-0.5">84.2%</span>
+                  <span className="text-[10px] text-zinc-400 block font-semibold">+4.8% trong khung gio vang</span>
+                </div>
               </div>
             </div>
-          )}
+
+            {/* Central Display Panels for Dashboard Overview */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative min-h-[400px]">
+              <div className="space-y-6">
+                <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <span>Giao dịch vé gần đây</span>
+                </h2>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-zinc-400">
+                    <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
+                      <tr>
+                        <th className="py-3 px-4">Ma ve</th>
+                        <th className="py-3 px-4">Khach hang</th>
+                        <th className="py-3 px-4">Phim</th>
+                        <th className="py-3 px-4">Suat chieu</th>
+                        <th className="py-3 px-4">Ghe</th>
+                        <th className="py-3 px-4">Tong tien</th>
+                        <th className="py-3 px-4">Trang thai</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {tickets.map(t => (
+                        <tr key={t.id}>
+                          <td className="py-3.5 px-4 font-mono text-brand-yellow font-bold">{t.id}</td>
+                          <td className="py-3.5 px-4 font-bold text-white">{t.customerName}</td>
+                          <td className="py-3.5 px-4">{t.movieTitle}</td>
+                          <td className="py-3.5 px-4 font-semibold text-brand-coral">{t.time} | {t.date}</td>
+                          <td className="py-3.5 px-4">{t.seats.join(', ')}</td>
+                          <td className="py-3.5 px-4 text-emerald-400 font-extrabold">{t.totalAmount.toLocaleString('vi-VN')}đ</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                              t.status === 'DA_KIEM_TRA' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                : 'bg-zinc-800 text-zinc-400 border-zinc-700/50'
+                            }`}>
+                              {t.status === 'DA_KIEM_TRA' ? 'Da kiem tra' : 'Chua check-in'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab !== 'dashboard' && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative min-h-[400px]">
 
           {/* Movies list CRUD view */}
           {activeTab === 'movies' && (
@@ -986,57 +1069,90 @@ export default function AdminDashboardView({ onBackHome }) {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Master: Theater List */}
                 <div className="space-y-3">
-                  <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block">Danh sach cum rap</span>
-                  {theaters.map(t => (
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2">
+                    <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block">Danh sach cum rap</span>
                     <button
-                      key={t.id}
-                      onClick={() => setSelectedTheaterId(t.id)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all ${
-                        selectedTheaterId === t.id 
-                          ? 'bg-brand-coral/10 border-brand-coral text-white' 
-                          : 'bg-zinc-950 border-zinc-850 text-zinc-400 hover:bg-zinc-900/50'
-                      }`}
+                      onClick={handleOpenAddTheater}
+                      className="flex items-center gap-1.5 bg-brand-coral hover:bg-opacity-95 text-white text-[10px] font-black py-1.5 px-3 rounded-lg uppercase tracking-wider transition-all"
                     >
-                      <h4 className="font-bold text-sm block">{t.name}</h4>
-                      <p className="text-[11px] text-zinc-500 truncate mt-1">{t.address}</p>
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Thêm Rạp Mới</span>
                     </button>
-                  ))}
+                  </div>
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                    {theaters.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTheaterId(t.id)}
+                        className={`w-full text-left p-4 rounded-xl border transition-all ${
+                          selectedTheaterId === t.id 
+                            ? 'bg-brand-coral/10 border-brand-coral text-white' 
+                            : 'bg-zinc-950 border-zinc-850 text-zinc-400 hover:bg-zinc-900/50'
+                        }`}
+                      >
+                        <h4 className="font-bold text-sm block">{t.name}</h4>
+                        <p className="text-[11px] text-zinc-500 truncate mt-1">{t.address}</p>
+                      </button>
+                    ))}
+                    {theaters.length === 0 && (
+                      <div className="text-center py-8 text-zinc-600 text-xs font-semibold">Chưa có cụm rạp nào</div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Detail: Halls list */}
                 <div className="lg:col-span-2 bg-zinc-950/50 border border-zinc-850 p-6 rounded-2xl space-y-6">
-                  <div className="flex justify-between items-center border-b border-zinc-850 pb-4">
-                    <div>
-                      <h3 className="font-bold text-white text-base">{selectedTheater.name}</h3>
-                      <p className="text-zinc-500 text-xs mt-0.5">{selectedTheater.address}</p>
-                    </div>
-                    <button
-                      onClick={() => handleAddHall(selectedTheater.id)}
-                      className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-black px-3.5 py-2 rounded-lg text-white"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      <span>THEM PHONG</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {selectedTheater.halls.map(h => (
-                      <div key={h.id} className="bg-zinc-900/40 border border-zinc-850/80 p-4 rounded-xl flex items-center justify-between gap-4">
+                  {selectedTheater ? (
+                    <>
+                      <div className="flex justify-between items-center border-b border-zinc-850 pb-4">
                         <div>
-                          <h4 className="font-bold text-white text-sm">{h.name}</h4>
-                          <span className="text-[10px] text-zinc-500 block uppercase font-bold mt-1">
-                            Dinh dang: {h.format} | Suc chua: {h.capacity} ghe
-                          </span>
+                          <h3 className="font-bold text-white text-base">{selectedTheater.name}</h3>
+                          <p className="text-zinc-500 text-xs mt-0.5">{selectedTheater.address}</p>
                         </div>
                         <button
-                          onClick={() => handleRenameHall(selectedTheater.id, h.id)}
-                          className="py-1.5 px-3 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-[10px] font-bold text-zinc-300 rounded"
+                          onClick={() => handleOpenAddHall(selectedTheater.id)}
+                          className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-black px-3.5 py-2 rounded-lg text-white transition-colors"
                         >
-                          Doi ten
+                          <PlusCircle className="w-3.5 h-3.5 text-brand-coral" />
+                          <span>THÊM PHÒNG CHIẾU</span>
                         </button>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+                        {selectedTheater.halls && selectedTheater.halls.map(h => (
+                          <div key={h.id} className="bg-zinc-900/40 border border-zinc-855 p-4 rounded-xl flex items-center justify-between gap-4 hover:border-zinc-800 transition-colors">
+                            <div>
+                              <h4 className="font-bold text-white text-sm">{h.name}</h4>
+                              <span className="text-[10px] text-zinc-500 block uppercase font-bold mt-1">
+                                Dinh dang: {h.format} | Suc chua: {h.capacity} ghe
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleRenameHall(selectedTheater.id, h.id)}
+                                className="py-1.5 px-3 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-white text-[10px] font-bold text-zinc-400 rounded transition-colors"
+                              >
+                                Doi ten
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHall(selectedTheater.id, h.id)}
+                                className="py-1.5 px-3 bg-red-950/20 border border-red-900/30 hover:border-red-900/60 hover:bg-red-950/40 text-[10px] font-bold text-red-400 rounded transition-colors"
+                              >
+                                Xoa
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {(!selectedTheater.halls || selectedTheater.halls.length === 0) && (
+                          <div className="text-center py-12 text-zinc-600 text-xs font-semibold">Chưa có phòng chiếu nào</div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-24 text-zinc-650 text-xs font-bold uppercase tracking-wider">
+                      Vui lòng chọn một cụm rạp để xem chi tiết
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1320,6 +1436,7 @@ export default function AdminDashboardView({ onBackHome }) {
           )}
 
         </div>
+        )}
       </main>
 
       {/* Movie add/edit modal form */}
@@ -1589,6 +1706,119 @@ export default function AdminDashboardView({ onBackHome }) {
               className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider"
             >
               Luu thong tin
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Theater add modal form */}
+      {theaterModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSaveTheater} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Thêm cụm rạp mới</h3>
+              <button type="button" onClick={() => setTheaterModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Tên cụm rạp</label>
+              <input
+                type="text"
+                value={theaterForm.name}
+                onChange={(e) => setTheaterForm({ ...theaterForm, name: e.target.value })}
+                placeholder="VD: Lora Nguyễn Trãi"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Địa chỉ</label>
+              <input
+                type="text"
+                value={theaterForm.address}
+                onChange={(e) => setTheaterForm({ ...theaterForm, address: e.target.value })}
+                placeholder="VD: 235 Nguyễn Văn Cừ, Quận 5, TP. HCM"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Số lượng phòng chiếu mặc định</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={theaterForm.defaultHallsCount}
+                onChange={(e) => setTheaterForm({ ...theaterForm, defaultHallsCount: parseInt(e.target.value) || 1 })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider"
+            >
+              Lưu thông tin
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Hall add modal form */}
+      {hallModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSaveHall} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Thêm phòng chiếu mới</h3>
+              <button type="button" onClick={() => setHallModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Tên phòng chiếu</label>
+              <input
+                type="text"
+                value={hallForm.name}
+                onChange={(e) => setHallForm({ ...hallForm, name: e.target.value })}
+                placeholder="VD: Phòng Chiếu 5"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Sức chứa (Ghế)</label>
+              <input
+                type="number"
+                min="10"
+                max="300"
+                value={hallForm.capacity}
+                onChange={(e) => setHallForm({ ...hallForm, capacity: parseInt(e.target.value) || 120 })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Định dạng chiếu</label>
+              <select
+                value={hallForm.format}
+                onChange={(e) => setHallForm({ ...hallForm, format: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              >
+                <option value="2D Digital">2D Digital</option>
+                <option value="3D Digital">3D Digital</option>
+                <option value="IMAX 3D">IMAX 3D</option>
+                <option value="Gold Class">Gold Class</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider"
+            >
+              Lưu thông tin
             </button>
           </form>
         </div>
