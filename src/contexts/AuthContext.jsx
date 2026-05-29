@@ -111,6 +111,22 @@ export function AuthProvider({ children }) {
     return { success: true };
   };
 
+  const updateUser = (updatedUserFields) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...updatedUserFields };
+    setUser(updatedUser);
+    localStorage.setItem('lora_session', JSON.stringify(updatedUser));
+
+    const updatedList = usersList.map((u) => {
+      if (u.email.toLowerCase() === user.email.toLowerCase()) {
+        return { ...u, ...updatedUserFields };
+      }
+      return u;
+    });
+    setUsersList(updatedList);
+    localStorage.setItem('lora_users', JSON.stringify(updatedList));
+  };
+
   const isAuthenticated = user !== null && userRole !== 'GUEST';
 
   return (
@@ -121,7 +137,8 @@ export function AuthProvider({ children }) {
         isAuthenticated,
         login,
         logout,
-        register
+        register,
+        updateUser
       }}
     >
       {children}

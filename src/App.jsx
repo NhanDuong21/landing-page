@@ -10,6 +10,7 @@ import LoginView from './components/LoginView';
 import RegisterView from './components/RegisterView';
 import AdminDashboardView from './components/AdminDashboardView';
 import EmployeeDashboardView from './components/EmployeeDashboardView';
+import CustomerProfileView from './components/CustomerProfileView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppInner() {
@@ -144,6 +145,10 @@ function AppInner() {
             onBackHome={() => handleViewChange({ name: 'home', data: null })}
             onTicketingSelect={(bookingData) => handleViewChange({ name: 'seats', data: bookingData })}
           />
+        )}
+
+        {currentView.name === 'profile' && (
+          <CustomerProfileView onBackHome={() => handleViewChange({ name: 'home', data: null })} />
         )}
       </main>
 

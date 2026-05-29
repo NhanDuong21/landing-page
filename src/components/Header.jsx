@@ -184,7 +184,7 @@ export default function Header({ onNavigate }) {
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          alert('Chức năng hồ sơ cá nhân đang phát triển!');
+                          onNavigate('profile');
                         }}
                         className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
                       >
@@ -193,7 +193,7 @@ export default function Header({ onNavigate }) {
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          alert('Chức năng xem lịch sử đặt vé đang phát triển!');
+                          onNavigate('profile');
                         }}
                         className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
                       >
