@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, ShieldAlert, ArrowLeft, Loader2 } from 'lucide-react';
+import { Mail, Lock, ShieldAlert, ArrowLeft, Loader2, Shield, Briefcase, User } from 'lucide-react';
 
 export default function LoginView({ onBack, onRegisterLink, onSuccess }) {
   const { login } = useAuth();
@@ -172,7 +172,10 @@ export default function LoginView({ onBack, onRegisterLink, onSuccess }) {
             onClick={() => handleFastFill('ADMIN')}
             className="w-full text-left bg-rose-950/30 border border-rose-900/60 hover:bg-rose-900/30 text-rose-300 py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors duration-300"
           >
-            <span>🔐 Đăng nhập nhanh Admin</span>
+            <div className="flex items-center gap-2">
+              <Shield className="w-4.5 h-4.5 text-rose-400 shrink-0" />
+              <span>Đăng nhập nhanh Admin</span>
+            </div>
             <span className="text-[10px] uppercase font-black text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded">
               ADMIN
             </span>
@@ -181,7 +184,10 @@ export default function LoginView({ onBack, onRegisterLink, onSuccess }) {
             onClick={() => handleFastFill('EMPLOYEE')}
             className="w-full text-left bg-amber-950/30 border border-amber-900/60 hover:bg-amber-900/30 text-amber-300 py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors duration-300"
           >
-            <span>💼 Đăng nhập nhanh Nhân viên</span>
+            <div className="flex items-center gap-2">
+              <Briefcase className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+              <span>Đăng nhập nhanh Nhân viên</span>
+            </div>
             <span className="text-[10px] uppercase font-black text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded">
               STAFF
             </span>
@@ -190,7 +196,10 @@ export default function LoginView({ onBack, onRegisterLink, onSuccess }) {
             onClick={() => handleFastFill('CUSTOMER')}
             className="w-full text-left bg-emerald-950/30 border border-emerald-900/60 hover:bg-emerald-900/30 text-emerald-300 py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors duration-300"
           >
-            <span>👤 Đăng nhập nhanh Khách hàng</span>
+            <div className="flex items-center gap-2">
+              <User className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+              <span>Đăng nhập nhanh Khách hàng</span>
+            </div>
             <span className="text-[10px] uppercase font-black text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded">
               MEMBER
             </span>
