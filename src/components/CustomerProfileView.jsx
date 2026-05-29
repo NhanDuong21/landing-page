@@ -11,12 +11,14 @@ export default function CustomerProfileView({ onBackHome }) {
   // Local state for tabs: 'info', 'history', 'notifications', 'gifts', 'policy'
   const [activeTab, setActiveTab] = useState('info');
 
-  // Load user data fields with fallback defaults
-  const [fullName, setFullName] = useState(user?.fullName || 'Nguyễn Khách Hàng');
-  const [birthday, setBirthday] = useState(user?.birthday || '1998-05-15');
+  // Load user data fields (Name, Birthday, Gender are strictly read-only disabled)
+  const fullName = user?.fullName || 'Nguyễn Khách Hàng';
+  const birthday = user?.birthday || '1998-05-15';
+  const gender = user?.gender || 'Nam';
+  
+  // Editable fields
   const [email, setEmail] = useState(user?.email || 'member@gmail.com');
   const [phone, setPhone] = useState(user?.phone || '0987654321');
-  const [gender, setGender] = useState(user?.gender || 'Nam');
   
   // Avatar URL state
   const [avatarUrl, setAvatarUrl] = useState(
@@ -107,23 +109,17 @@ export default function CustomerProfileView({ onBackHome }) {
     }, 3500);
   };
 
-  // Profile Form submit
+  // Profile Form submit (Updates Email & SĐT)
   const handleUpdateProfile = (e) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      triggerToast('Họ và tên không được để trống!', 'error');
-      return;
-    }
     if (!phone.trim()) {
       triggerToast('Số điện thoại không được để trống!', 'error');
       return;
     }
 
     updateUser({
-      fullName,
-      birthday,
+      email,
       phone,
-      gender,
       avatarUrl,
       totalSpending,
       points
@@ -429,35 +425,35 @@ export default function CustomerProfileView({ onBackHome }) {
               {activeTab === 'info' && (
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {/* Full Name field */}
+                    {/* Full Name field (STRICTLY READ-ONLY DISABLED) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block">Họ và tên</label>
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-655" />
                         <input
                           type="text"
+                          disabled
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-brand-coral rounded-xl py-3 pl-11 pr-4 text-xs font-semibold text-white focus:outline-none transition-colors"
+                          className="w-full bg-zinc-900/50 text-zinc-500 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-xs font-semibold select-none cursor-not-allowed"
                         />
                       </div>
                     </div>
 
-                    {/* Birthday field */}
+                    {/* Birthday field (STRICTLY READ-ONLY DISABLED) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block">Ngày sinh</label>
                       <div className="relative">
-                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-655" />
                         <input
                           type="date"
+                          disabled
                           value={birthday}
-                          onChange={(e) => setBirthday(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 focus:border-brand-coral rounded-xl py-3 pl-11 pr-4 text-xs font-semibold text-white focus:outline-none transition-colors"
+                          className="w-full bg-zinc-900/50 text-zinc-500 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-xs font-semibold select-none cursor-not-allowed"
                         />
                       </div>
                     </div>
 
-                    {/* Email field (Not directly editable, has Change action toggle) */}
+                    {/* Email field (EDITABLE - toggle to update) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block flex justify-between">
                         <span>Địa chỉ Email</span>
@@ -493,18 +489,18 @@ export default function CustomerProfileView({ onBackHome }) {
                         </div>
                       ) : (
                         <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700" />
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                           <input
                             type="email"
                             disabled
                             value={email}
-                            className="w-full bg-zinc-950/40 border border-zinc-900 text-zinc-500 rounded-xl py-3 pl-11 pr-4 text-xs font-semibold select-none cursor-not-allowed"
+                            className="w-full bg-zinc-950/40 border border-zinc-900 text-zinc-400 rounded-xl py-3 pl-11 pr-4 text-xs font-semibold select-none cursor-not-allowed"
                           />
                         </div>
                       )}
                     </div>
 
-                    {/* Phone field */}
+                    {/* Phone field (EDITABLE) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block">Số điện thoại</label>
                       <div className="relative">
@@ -518,28 +514,24 @@ export default function CustomerProfileView({ onBackHome }) {
                       </div>
                     </div>
 
-                    {/* Gender select field */}
+                    {/* Gender field (STRICTLY READ-ONLY DISABLED) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block">Giới tính</label>
                       <div className="flex gap-4">
                         <button
                           type="button"
-                          onClick={() => setGender('Nam')}
-                          className={`flex-grow py-3 rounded-xl border text-xs font-bold transition-all duration-300 ${
-                            gender === 'Nam'
-                              ? 'bg-brand-coral/10 border-brand-coral text-white'
-                              : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'
+                          disabled
+                          className={`flex-grow py-3 rounded-xl border text-xs font-bold transition-all duration-300 bg-zinc-900/50 text-zinc-500 border-zinc-800 cursor-not-allowed ${
+                            gender === 'Nam' ? 'opacity-100 border-brand-coral/40 text-brand-coral' : 'opacity-40'
                           }`}
                         >
                           Nam
                         </button>
                         <button
                           type="button"
-                          onClick={() => setGender('Nữ')}
-                          className={`flex-grow py-3 rounded-xl border text-xs font-bold transition-all duration-300 ${
-                            gender === 'Nữ'
-                              ? 'bg-brand-coral/10 border-brand-coral text-white'
-                              : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'
+                          disabled
+                          className={`flex-grow py-3 rounded-xl border text-xs font-bold transition-all duration-300 bg-zinc-900/50 text-zinc-500 border-zinc-800 cursor-not-allowed ${
+                            gender === 'Nữ' ? 'opacity-100 border-brand-coral/40 text-brand-coral' : 'opacity-40'
                           }`}
                         >
                           Nữ
@@ -547,7 +539,7 @@ export default function CustomerProfileView({ onBackHome }) {
                       </div>
                     </div>
 
-                    {/* Password field (Masked with changes) */}
+                    {/* Password field (Obscured mask with active Change trigger) */}
                     <div className="space-y-2">
                       <label className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block flex justify-between">
                         <span>Mật khẩu</span>
@@ -797,7 +789,7 @@ export default function CustomerProfileView({ onBackHome }) {
               <div className="space-y-1.5">
                 <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Mật khẩu mới</label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-650" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-655" />
                   <input
                     type="password"
                     value={newPassword}
@@ -810,7 +802,7 @@ export default function CustomerProfileView({ onBackHome }) {
               <div className="space-y-1.5">
                 <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Xác nhận mật khẩu mới</label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-650" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-655" />
                   <input
                     type="password"
                     value={confirmPassword}
@@ -825,7 +817,7 @@ export default function CustomerProfileView({ onBackHome }) {
               <button
                 type="button"
                 onClick={() => setIsChangingPassword(false)}
-                className="flex-grow bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider transition-colors"
+                className="flex-grow bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider transition-colors"
               >
                 Hủy
               </button>
@@ -879,7 +871,7 @@ export default function CustomerProfileView({ onBackHome }) {
 
               {/* Presets options */}
               <div className="space-y-1.5">
-                <span className="text-[10px] text-zinc-550 font-bold uppercase tracking-wider block">Hoặc chọn ảnh có sẵn:</span>
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Hoặc chọn ảnh có sẵn:</span>
                 <div className="flex gap-2">
                   {[
                     'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
