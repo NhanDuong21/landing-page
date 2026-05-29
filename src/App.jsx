@@ -29,7 +29,10 @@ function App() {
             <Hero />
 
             {/* Featured Films Grid */}
-            <MovieGrid onSelectMovie={(movieId) => handleViewChange({ name: 'detail', data: { movieId } })} />
+            <MovieGrid
+              onSelectMovie={(movieId) => handleViewChange({ name: 'detail', data: { movieId } })}
+              onBuyTicket={(bookingData) => handleViewChange({ name: 'seats', data: bookingData })}
+            />
 
             {/* Horizontal Booking Workflow steps */}
             <BookingSteps />
