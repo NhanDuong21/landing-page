@@ -15,10 +15,17 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 function AppInner() {
   const [currentView, setCurrentView] = useState({ name: 'home', data: null });
   const [pendingBooking, setPendingBooking] = useState(null);
-  const { userRole } = useAuth();
+  const { userRole, isAuthenticated } = useAuth();
 
   // Scroll to top on view changes
   const handleViewChange = (newView) => {
+    if (newView.name === 'seats' && !isAuthenticated) {
+      setPendingBooking({ bookingData: newView.data });
+      localStorage.setItem('lora_pending_booking', JSON.stringify(newView.data));
+      setCurrentView({ name: 'login', data: null });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setCurrentView(newView);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -33,11 +40,20 @@ function AppInner() {
 
   // Login Success Callback handler
   const handleLoginSuccess = (loggedInUser) => {
-    if (pendingBooking) {
-      // Restore cached seat selections and return straight to seats panel
-      const restored = pendingBooking;
+    const stored = localStorage.getItem('lora_pending_booking');
+    let targetBooking = pendingBooking;
+    if (!targetBooking && stored) {
+      try {
+        targetBooking = { bookingData: JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    if (targetBooking) {
       setPendingBooking(null);
-      handleViewChange({ name: 'seats', data: restored.bookingData });
+      localStorage.removeItem('lora_pending_booking');
+      handleViewChange({ name: 'seats', data: targetBooking.bookingData });
     } else if (loggedInUser.role === 'ADMIN') {
       handleViewChange({ name: 'admin', data: null });
     } else if (loggedInUser.role === 'EMPLOYEE') {

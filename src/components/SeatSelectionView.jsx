@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { ArrowLeft, CheckCircle, Info } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Info, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { MOVIES } from '../data/mockData';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
@@ -10,14 +11,54 @@ const SEAT_PRICES = {
   couple: 220000
 };
 
+const CONCESSIONS = [
+  {
+    id: 'combo-solo',
+    name: 'Combo Solo',
+    description: '1 Bắp ngọt lớn + 1 Soda (L)',
+    price: 75000,
+    image: 'https://images.unsplash.com/photo-1578849278619-e73505e9610f?w=300&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'combo-couple',
+    name: 'Combo Couple',
+    description: '1 Bắp ngọt lớn + 2 Soda (L)',
+    price: 105000,
+    image: 'https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=300&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'combo-party',
+    name: 'Combo Party Lora',
+    description: '2 Bắp lớn + 3 Soda (L) + 1 Snack khoai tây',
+    price: 165000,
+    image: 'https://images.unsplash.com/photo-1610483178766-82046db3e477?w=300&auto=format&fit=crop&q=80'
+  }
+];
+
 export default function SeatSelectionView({ bookingData, onBack, onRequireLogin }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   // Support restoring selected seats after dynamic redirection authentication
   const [selectedSeats, setSelectedSeats] = useState(bookingData.selectedSeats || []);
+  const [selectedConcessions, setSelectedConcessions] = useState({});
   const [toastMessage, setToastMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const { movieTitle, date, cinema, time, format } = bookingData;
+  const { movieTitle, date, cinema, time, format, movieId } = bookingData;
+
+  const movie = useMemo(() => {
+    return MOVIES.find((m) => m.id === movieId) || {
+      title: movieTitle,
+      posterUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80',
+      duration: '120 phút',
+      ageRating: 'P'
+    };
+  }, [movieId, movieTitle]);
+
+  const hallLabel = useMemo(() => {
+    if (format.toLowerCase().includes('imax')) return 'IMAX Theater';
+    const hash = (cinema + time).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return `Phòng Chiếu ${hash % 5 + 1}`;
+  }, [cinema, time, format]);
 
   // Determine occupied seats based on a deterministic hash so they are stable per showtime
   const occupiedSeats = useMemo(() => {
@@ -69,7 +110,27 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
     return 'standard';
   };
 
-  const totalAmount = useMemo(() => {
+  const handleIncreaseConcession = (id) => {
+    setSelectedConcessions(prev => ({
+      ...prev,
+      [id]: (prev[id] || 0) + 1
+    }));
+  };
+
+  const handleDecreaseConcession = (id) => {
+    setSelectedConcessions(prev => {
+      const nextVal = (prev[id] || 0) - 1;
+      const nextState = { ...prev };
+      if (nextVal <= 0) {
+        delete nextState[id];
+      } else {
+        nextState[id] = nextVal;
+      }
+      return nextState;
+    });
+  };
+
+  const totalSeatsPrice = useMemo(() => {
     return selectedSeats.reduce((sum, seat) => {
       const row = seat.charAt(0);
       const type = getSeatType(row);
@@ -77,12 +138,21 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
     }, 0);
   }, [selectedSeats]);
 
+  const totalConcessionsPrice = useMemo(() => {
+    return Object.entries(selectedConcessions).reduce((sum, [id, qty]) => {
+      const item = CONCESSIONS.find(c => c.id === id);
+      return sum + (item ? item.price * qty : 0);
+    }, 0);
+  }, [selectedConcessions]);
+
+  const totalAmount = useMemo(() => {
+    return totalSeatsPrice + totalConcessionsPrice;
+  }, [totalSeatsPrice, totalConcessionsPrice]);
+
   // Format currency in VND
   const formatCurrency = (val) => {
     return val.toLocaleString('vi-VN') + 'đ';
   };
-
-  const { user } = useAuth();
 
   const handleCheckoutSubmit = () => {
     if (selectedSeats.length === 0) return;
@@ -100,16 +170,27 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
       return;
     }
 
+    const concessionItems = Object.entries(selectedConcessions).map(([id, qty]) => {
+      const combo = CONCESSIONS.find(c => c.id === id);
+      return {
+        id,
+        name: combo?.name || '',
+        quantity: qty,
+        price: combo?.price || 0
+      };
+    });
+
     // Generate new ticket object
     const newTicket = {
       id: `TKT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
-      customerName: user?.fullName || 'Khach Vang Lai',
+      customerName: user?.fullName || 'Khách Vãng Lai',
       customerEmail: user?.email || 'customer@gmail.com',
       movieTitle: movieTitle,
       theaterName: cinema,
       time: time,
       date: date,
       seats: selectedSeats,
+      concessions: concessionItems,
       totalAmount: totalAmount,
       status: 'CHUA_KIEM_TRA',
       timestamp: new Date().toISOString()
@@ -125,192 +206,321 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
   };
 
   return (
-    <div className="bg-zinc-950 text-zinc-100 min-h-screen py-10 px-6 md:px-12 flex flex-col justify-between">
-      {/* Top Breadcrumb Header Strip */}
-      <div className="max-w-6xl w-full mx-auto mb-8">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-zinc-400 hover:text-brand-coral transition-colors mb-4 text-sm font-semibold"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Quay lại</span>
-        </button>
-
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <span className="text-[10px] bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-2 py-0.5 rounded font-black uppercase tracking-wider text-xs mr-2">
-              {format}
-            </span>
-            <h1 className="text-xl font-black text-white inline-block">{movieTitle}</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-zinc-400">
-            <div>
-              <span className="text-zinc-600 font-bold mr-1">Rạp:</span>
-              <span className="text-zinc-200 font-semibold">{cinema}</span>
-            </div>
-            <div>
-              <span className="text-zinc-600 font-bold mr-1">Suất chiếu:</span>
-              <span className="text-brand-coral font-black">{time}</span>
-            </div>
-            <div>
-              <span className="text-zinc-600 font-bold mr-1">Ngày:</span>
-              <span className="text-zinc-200 font-semibold">{date}</span>
-            </div>
-          </div>
+    <div className="bg-zinc-950 text-zinc-100 min-h-screen py-10 px-4 md:px-12">
+      {/* Toast Warning Popup */}
+      {toastMessage && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white font-bold py-3 px-6 rounded-xl shadow-2xl flex items-center gap-2 border border-red-500 text-sm">
+          <Info className="w-4 h-4 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
-      </div>
+      )}
 
-      {/* Screen & Matrix Container */}
-      <div className="flex-grow max-w-6xl w-full mx-auto flex flex-col justify-center my-6 relative">
-        {/* Toast Warning Popup */}
-        {toastMessage && (
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white font-bold py-3 px-6 rounded-xl shadow-2xl flex items-center gap-2 animate-bounce border border-red-500 text-sm">
-            <Info className="w-4 h-4 shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
+      <div className="max-w-7xl mx-auto w-full">
+        {/* Main Grid Wrapper */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          
+          {/* LEFT MAIN PANEL (Screen, Seats Matrix & Concessions Module) */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Header Strip with Back link */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2 text-zinc-400 hover:text-brand-coral transition-colors text-sm font-semibold self-start sm:self-auto"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Quay lại phim</span>
+              </button>
+              
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-400">
+                <div>
+                  <span className="text-zinc-600 font-bold mr-1">Rạp:</span>
+                  <span className="text-zinc-200 font-semibold">{cinema}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-600 font-bold mr-1">Suất chiếu:</span>
+                  <span className="text-brand-coral font-black">{time}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-600 font-bold mr-1">Ngày:</span>
+                  <span className="text-zinc-200 font-semibold">{date}</span>
+                </div>
+              </div>
+            </div>
 
-        {/* The Silver Screen Curve */}
-        <div className="w-full max-w-lg mx-auto mb-16 text-center">
-          <div className="h-1.5 bg-gradient-to-r from-transparent via-brand-coral to-transparent shadow-[0_0_20px_rgba(216,129,116,0.9)] rounded-full mb-2"></div>
-          <span className="text-zinc-500 text-[10px] md:text-xs tracking-[0.4em] font-black uppercase">MÀN HÌNH CHÍNH / MAIN SCREEN</span>
-        </div>
+            {/* Screening Area */}
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col justify-center relative overflow-hidden">
+              {/* The Silver Screen Curve */}
+              <div className="w-full max-w-lg mx-auto mb-16 text-center">
+                <div className="h-1.5 bg-gradient-to-r from-transparent via-brand-coral to-transparent shadow-[0_0_20px_rgba(216,129,116,0.9)] rounded-full mb-2"></div>
+                <span className="text-zinc-500 text-[10px] tracking-[0.4em] font-black uppercase">MÀN HÌNH CHÍNH / MAIN SCREEN</span>
+              </div>
 
-        {/* Architectural Seating Grid */}
-        <div className="w-full overflow-x-auto py-4 scrollbar-thin scrollbar-thumb-zinc-800">
-          <div className="min-w-[620px] max-w-2xl mx-auto px-4">
-            <div className="space-y-3">
-              {ROWS.map((row) => {
-                const isCoupleRow = row === 'J';
-                const seatCount = isCoupleRow ? 6 : 12;
+              {/* Architectural Seating Grid */}
+              <div className="w-full overflow-x-auto py-4 scrollbar-thin scrollbar-thumb-zinc-800">
+                <div className="min-w-[620px] max-w-2xl mx-auto px-4">
+                  <div className="space-y-3">
+                    {ROWS.map((row) => {
+                      const isCoupleRow = row === 'J';
+                      const seatCount = isCoupleRow ? 6 : 12;
 
-                return (
-                  <div key={row} className="flex items-center gap-3">
-                    {/* Row Label Left */}
-                    <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
+                      return (
+                        <div key={row} className="flex items-center gap-3">
+                          {/* Row Label Left */}
+                          <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
 
-                    {/* Seats Row Grid */}
-                    <div className="flex-grow grid grid-cols-12 gap-2">
-                      {Array.from({ length: seatCount }).map((_, idx) => {
-                        const colNumber = idx + 1;
-                        const label = `${row}${colNumber}`;
-                        const isOccupied = occupiedSeats.has(label);
-                        const isSelected = selectedSeats.includes(label);
-                        
-                        let seatClass;
-                        let textLabel = label;
+                          {/* Seats Row Grid */}
+                          <div className="flex-grow grid grid-cols-12 gap-2">
+                            {Array.from({ length: seatCount }).map((_, idx) => {
+                              const colNumber = idx + 1;
+                              const label = `${row}${colNumber}`;
+                              const isOccupied = occupiedSeats.has(label);
+                              const isSelected = selectedSeats.includes(label);
+                              
+                              let seatClass;
+                              let textLabel = label;
 
-                        if (isOccupied) {
-                          seatClass = 'bg-zinc-900 border border-zinc-800 text-zinc-600 line-through opacity-40 cursor-not-allowed pointer-events-none';
-                        } else if (isSelected) {
-                          seatClass = 'bg-emerald-500 border-emerald-400 text-black font-extrabold shadow-lg shadow-emerald-500/20';
-                        } else {
-                          // Type styling
-                          if (isCoupleRow) {
-                            seatClass = 'bg-rose-600/20 border border-rose-500/80 hover:bg-rose-500/40 text-rose-300';
-                          } else if (['F', 'G', 'H', 'I'].includes(row)) {
-                            seatClass = 'bg-amber-600/20 border border-amber-500/80 hover:bg-amber-500/40 text-amber-300';
-                          } else {
-                            seatClass = 'bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-400';
-                          }
-                        }
+                              if (isOccupied) {
+                                seatClass = 'bg-zinc-950 border border-zinc-900 text-zinc-700 line-through opacity-30 cursor-not-allowed pointer-events-none';
+                              } else if (isSelected) {
+                                seatClass = 'bg-emerald-500 border-emerald-400 text-black font-extrabold shadow-lg shadow-emerald-500/20';
+                              } else {
+                                // Type styling
+                                if (isCoupleRow) {
+                                  seatClass = 'bg-rose-600/10 border border-rose-500/40 hover:bg-rose-500/30 text-rose-400';
+                                } else if (['F', 'G', 'H', 'I'].includes(row)) {
+                                  seatClass = 'bg-amber-600/10 border border-amber-500/40 hover:bg-amber-500/30 text-amber-400';
+                                } else {
+                                  seatClass = 'bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-400';
+                                }
+                              }
 
-                        // Couple seat occupies double width span
-                        const colSpan = isCoupleRow ? 'col-span-2' : 'col-span-1';
+                              // Couple seat occupies double width span
+                              const colSpan = isCoupleRow ? 'col-span-2' : 'col-span-1';
 
-                        if (isCoupleRow) {
-                          textLabel = `J${colNumber * 2 - 1}-J${colNumber * 2}`;
-                        }
+                              if (isCoupleRow) {
+                                textLabel = `J${colNumber * 2 - 1}-J${colNumber * 2}`;
+                              }
 
-                        return (
-                          <button
-                            key={label}
-                            disabled={isOccupied}
-                            onClick={() => handleSeatClick(label)}
-                            className={`${colSpan} aspect-square md:aspect-auto md:h-10 rounded-lg flex items-center justify-center text-[10px] md:text-xs font-semibold tracking-tighter transition-all duration-200 select-none ${seatClass}`}
-                            aria-label={`Select seat ${textLabel}`}
-                          >
-                            {textLabel}
-                          </button>
-                        );
-                      })}
-                    </div>
+                              return (
+                                <button
+                                  key={label}
+                                  disabled={isOccupied}
+                                  onClick={() => handleSeatClick(label)}
+                                  className={`${colSpan} aspect-square md:aspect-auto md:h-10 rounded-lg flex items-center justify-center text-[10px] md:text-xs font-semibold tracking-tighter transition-all duration-200 select-none ${seatClass}`}
+                                  aria-label={`Select seat ${textLabel}`}
+                                >
+                                  {textLabel}
+                                </button>
+                              );
+                            })}
+                          </div>
 
-                    {/* Row Label Right */}
-                    <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
+                          {/* Row Label Right */}
+                          <span className="w-4 text-center font-black text-xs text-zinc-500">{row}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              </div>
+
+              {/* Legend Map */}
+              <div className="flex flex-wrap justify-center gap-6 mt-12 text-xs text-zinc-400 border-t border-zinc-850 pt-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-zinc-800 border border-zinc-700"></div>
+                  <span>Ghế thường (80k)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-amber-600/10 border border-amber-500/40"></div>
+                  <span>Ghế VIP (110k)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-4 rounded bg-rose-600/10 border border-rose-500/40"></div>
+                  <span>Ghế Đôi (220k)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-emerald-500 border border-emerald-400"></div>
+                  <span>Đang chọn</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-zinc-950 border border-zinc-900 line-through opacity-30 flex items-center justify-center text-[8px]">X</div>
+                  <span>Đã đặt</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Legend Map */}
-        <div className="flex flex-wrap justify-center gap-6 mt-12 text-xs md:text-sm text-zinc-400">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-zinc-800 border border-zinc-700"></div>
-            <span>Ghế thường (80k)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-amber-600/20 border border-amber-500"></div>
-            <span>Ghế VIP (110k)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-5 rounded bg-rose-600/20 border border-rose-500"></div>
-            <span>Ghế Đôi (220k)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-emerald-500 border border-emerald-400"></div>
-            <span>Đang chọn</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-zinc-900 border border-zinc-800 line-through opacity-40 flex items-center justify-center text-[8px]">X</div>
-            <span>Đã đặt</span>
-          </div>
-        </div>
-      </div>
+            {/* Integrated Interactive Concessions Section */}
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-6">
+              <div className="flex items-center gap-3">
+                <ShoppingBag className="w-5 h-5 text-brand-coral" />
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-wider">MUA KÈM BẮP NƯỚC</h3>
+                  <p className="text-zinc-500 text-xs mt-0.5">Ưu đãi giảm giá combo lớn khi mua trực tuyến</p>
+                </div>
+              </div>
 
-      {/* Bottom Subtotal Checkout Panel */}
-      <div className="max-w-6xl w-full mx-auto mt-10">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-center justify-between gap-6">
-          <div className="w-full lg:w-auto text-center lg:text-left">
-            <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">GHẾ ĐÃ CHỌN</span>
-            <div className="text-white text-lg font-black min-h-[28px] max-w-xl truncate">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {CONCESSIONS.map((combo) => {
+                  const qty = selectedConcessions[combo.id] || 0;
+                  return (
+                    <div key={combo.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-zinc-700 transition-colors">
+                      <div className="aspect-video bg-zinc-950 relative overflow-hidden">
+                        <img 
+                          src={combo.image} 
+                          alt={combo.name} 
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      <div className="p-4 flex-grow flex flex-col justify-between space-y-4">
+                        <div>
+                          <h4 className="font-bold text-white text-xs tracking-wide">{combo.name}</h4>
+                          <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">{combo.description}</p>
+                        </div>
+                        <div className="flex items-center justify-between pt-2">
+                          <span className="text-xs font-black text-brand-yellow">{formatCurrency(combo.price)}</span>
+                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 rounded-lg p-1 select-none">
+                            <button
+                              type="button"
+                              onClick={() => handleDecreaseConcession(combo.id)}
+                              className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-black text-white w-3 text-center">{qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleIncreaseConcession(combo.id)}
+                              className="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors font-extrabold text-xs"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT SIDEBAR PANEL (Sticky Booking Summary Ledger) */}
+          <div className="lg:col-span-1 lg:sticky lg:top-24 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-6 shadow-2xl">
+            
+            {/* Movie Metadata Block */}
+            <div className="flex gap-4 items-start pb-6 border-b border-zinc-800">
+              <div className="w-16 aspect-[2/3] rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0">
+                <img 
+                  src={movie.posterUrl || movie.image} 
+                  alt={movie.title} 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80';
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5 flex-grow">
+                <span className="inline-block text-[9px] bg-brand-coral/15 text-brand-coral border border-brand-coral/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                  {format}
+                </span>
+                <h3 className="text-sm font-black text-white line-clamp-2 mt-1 leading-snug">{movie.title}</h3>
+                <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-semibold">
+                  <span>{movie.duration}</span>
+                  <span>•</span>
+                  <span className="text-brand-yellow">{movie.ageRating}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Showtime Ticket Details */}
+            <div className="space-y-3 py-2 text-xs border-b border-zinc-800">
+              <div className="flex justify-between">
+                <span className="text-zinc-500 font-medium">Cụm rạp</span>
+                <span className="text-white font-bold text-right">{cinema}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 font-medium">Phòng chiếu</span>
+                <span className="text-zinc-200 font-bold text-right">{hallLabel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 font-medium">Suất chiếu</span>
+                <span className="text-brand-coral font-black text-right">{time} | {date}</span>
+              </div>
+            </div>
+
+            {/* Live Receipt Itemization Table */}
+            <div className="py-2 border-b border-zinc-800 space-y-4">
+              <span className="text-zinc-500 text-[10px] font-black uppercase tracking-wider block">Giao dịch chi tiết</span>
+              
+              {/* Seats list */}
               {selectedSeats.length > 0 ? (
-                selectedSeats.map(seat => {
-                  const row = seat.charAt(0);
-                  if (row === 'J') {
+                <div className="space-y-2">
+                  {selectedSeats.map(seat => {
+                    const row = seat.charAt(0);
+                    const type = getSeatType(row);
+                    const price = SEAT_PRICES[type];
+                    
                     const col = parseInt(seat.substring(1));
-                    return `J${col * 2 - 1}-J${col * 2}`;
-                  }
-                  return seat;
-                }).join(', ')
+                    const displayLabel = row === 'J'
+                      ? `J${col * 2 - 1}-J${col * 2} (Đôi)`
+                      : `${seat} (${type === 'vip' ? 'VIP' : 'Thường'})`;
+
+                    return (
+                      <div key={seat} className="flex justify-between text-xs">
+                        <span className="text-zinc-300">Ghế {displayLabel}</span>
+                        <span className="text-white font-bold">{formatCurrency(price)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <span className="text-zinc-600 italic">Vui lòng chọn ghế từ sơ đồ</span>
+                <div className="text-xs text-zinc-600 italic py-1">Chưa chọn ghế ngồi</div>
+              )}
+
+              {/* Concessions list */}
+              {Object.keys(selectedConcessions).length > 0 && (
+                <div className="space-y-2 pt-3 border-t border-zinc-850">
+                  {Object.entries(selectedConcessions).map(([id, qty]) => {
+                    const combo = CONCESSIONS.find(c => c.id === id);
+                    if (!combo) return null;
+                    return (
+                      <div key={id} className="flex justify-between text-xs">
+                        <span className="text-zinc-300">{combo.name} x{qty}</span>
+                        <span className="text-white font-bold">{formatCurrency(combo.price * qty)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          </div>
 
-          <div className="w-full lg:w-auto flex flex-col sm:flex-row items-center gap-6 shrink-0 justify-center">
-            <div className="text-center sm:text-right shrink-0">
-              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">TỔNG TIỀN</span>
-              <span className="text-2xl md:text-3xl font-black text-brand-coral">
-                {formatCurrency(totalAmount)}
-              </span>
+            {/* Dynamic Calculation Summary Block */}
+            <div className="flex justify-between items-center py-4 px-4 bg-zinc-950/60 rounded-2xl border border-zinc-850 shadow-inner">
+              <div>
+                <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider block">Tổng thanh toán</span>
+                <span className="text-[9px] text-zinc-600 block">(Bao gồm VAT)</span>
+              </div>
+              <span className="text-lg md:text-xl font-black text-brand-coral">{formatCurrency(totalAmount)}</span>
             </div>
 
+            {/* Primary Checkout Call-to-Action */}
             <button
               disabled={selectedSeats.length === 0}
               onClick={handleCheckoutSubmit}
-              className={`w-full sm:w-auto px-8 py-4 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg transition-all duration-300 transform ${
+              className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-wider shadow-lg transition-all duration-300 transform ${
                 selectedSeats.length > 0
-                  ? 'bg-brand-coral hover:bg-opacity-90 text-white cursor-pointer hover:scale-105 shadow-brand-coral/20'
+                  ? 'bg-brand-coral hover:bg-opacity-95 hover:scale-[1.02] text-white shadow-brand-coral/25'
                   : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
               }`}
             >
               Đặt Vé Ngay
             </button>
+
           </div>
+
         </div>
       </div>
 
@@ -322,31 +532,31 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
 
             <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
             
-            <h3 className="text-2xl font-black text-white uppercase tracking-wide mb-2">ĐẶT VÉ THÀNH CÔNG</h3>
-            <p className="text-zinc-400 text-sm mb-6">
-              Cảm ơn bạn đã lựa chọn Lora Film. Dưới đây là thông tin vé của bạn:
+            <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2">ĐẶT VÉ THÀNH CÔNG</h3>
+            <p className="text-zinc-400 text-xs mb-6 leading-relaxed">
+              Cảm ơn bạn đã lựa chọn LoraFilm. Dưới đây là thông tin chi tiết vé của bạn:
             </p>
 
-            <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 text-left space-y-2.5 text-sm mb-6">
-              <div>
+            <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 text-left space-y-2.5 text-xs mb-6">
+              <div className="flex justify-between">
                 <span className="text-zinc-500">Phim:</span>
-                <span className="float-right text-white font-extrabold">{movieTitle}</span>
+                <span className="text-white font-extrabold text-right ml-4">{movieTitle}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-zinc-500">Định dạng:</span>
-                <span className="float-right text-brand-yellow font-extrabold">{format}</span>
+                <span className="text-brand-yellow font-extrabold">{format}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-zinc-500">Rạp:</span>
-                <span className="float-right text-zinc-200 font-semibold">{cinema}</span>
+                <span className="text-zinc-200 font-semibold">{cinema}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-zinc-500">Suất chiếu:</span>
-                <span className="float-right text-white font-extrabold">{time} | {date}</span>
+                <span className="text-white font-extrabold">{time} | {date}</span>
               </div>
-              <div>
+              <div className="flex justify-between">
                 <span className="text-zinc-500">Ghế chọn:</span>
-                <span className="float-right text-emerald-400 font-extrabold">
+                <span className="text-emerald-400 font-extrabold text-right ml-4">
                   {selectedSeats.map(seat => {
                     const row = seat.charAt(0);
                     if (row === 'J') {
@@ -357,9 +567,26 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
                   }).join(', ')}
                 </span>
               </div>
-              <div className="border-t border-zinc-800/80 pt-2.5 mt-2.5">
+
+              {/* Popcorn snack sub-table */}
+              {Object.keys(selectedConcessions).length > 0 && (
+                <div className="border-t border-zinc-850 pt-2.5 mt-2.5 space-y-1.5">
+                  <span className="text-zinc-500 font-bold block">Bắp nước kèm theo:</span>
+                  {Object.entries(selectedConcessions).map(([id, qty]) => {
+                    const combo = CONCESSIONS.find(c => c.id === id);
+                    return (
+                      <div key={id} className="flex justify-between">
+                        <span className="text-zinc-400">{combo?.name}</span>
+                        <span className="text-white font-bold">x{qty}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="border-t border-zinc-800/80 pt-2.5 mt-2.5 flex justify-between items-center">
                 <span className="text-zinc-500 font-bold">Tổng thanh toán:</span>
-                <span className="float-right text-brand-coral font-black text-base">{formatCurrency(totalAmount)}</span>
+                <span className="text-brand-coral font-black text-sm">{formatCurrency(totalAmount)}</span>
               </div>
             </div>
 
@@ -375,6 +602,7 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
           </div>
         </div>
       )}
+
     </div>
   );
 }
