@@ -13,24 +13,66 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { MOVIES, CINEMA_CLUSTERS, SHOWTIMES } from '../data/mockData';
-
-// Mock Concessions items
-const CONCESSIONS_ITEMS = [
-  { id: 1, name: 'Bắp Rang Bơ Truyền Thống', price: 65000, desc: 'Bắp rang bơ thơm lừng, giòn rụm' },
-  { id: 2, name: 'Bắp Rang Phô Mai', price: 75000, desc: 'Bắp rang vị phô mai đậm đà ngọt béo' },
-  { id: 3, name: 'Bắp Rang Caramel', price: 75000, desc: 'Bắp ngọt vị caramel thơm ngọt' },
-  { id: 4, name: 'Coca Cola Lớn', price: 35000, desc: 'Nước ngọt có ga 32oz lạnh mát' },
-  { id: 5, name: 'Sprite Lớn', price: 35000, desc: 'Nước ngọt có ga hương chanh 32oz' },
-  { id: 6, name: 'Combo Solo', price: 90000, desc: '1 Bắp ngọt nhỏ + 1 Nước ngọt tùy chọn' },
-  { id: 7, name: 'Combo Couple', price: 135000, desc: '1 Bắp lớn + 2 Nước ngọt tùy chọn' }
-];
+import { 
+  INITIAL_MOVIES, 
+  INITIAL_SHOWTIMES, 
+  INITIAL_TICKETS, 
+  INITIAL_CONCESSIONS, 
+  INITIAL_THEATERS 
+} from '../data/mockDashboardData';
 
 export default function EmployeeDashboardView({ onBackHome, onTicketingSelect }) {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('ticketing');
 
-  // Concessions State
+  // Load from localStorage or pre-seeds
+  const [movies] = useState(() => {
+    const saved = localStorage.getItem('lora_movies');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_movies', JSON.stringify(INITIAL_MOVIES));
+    return INITIAL_MOVIES;
+  });
+
+  const [showtimes] = useState(() => {
+    const saved = localStorage.getItem('lora_showtimes');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_showtimes', JSON.stringify(INITIAL_SHOWTIMES));
+    return INITIAL_SHOWTIMES;
+  });
+
+  const [theaters] = useState(() => {
+    const saved = localStorage.getItem('lora_theaters');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_theaters', JSON.stringify(INITIAL_THEATERS));
+    return INITIAL_THEATERS;
+  });
+
+  const [tickets, setTickets] = useState(() => {
+    const saved = localStorage.getItem('lora_tickets');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_tickets', JSON.stringify(INITIAL_TICKETS));
+    return INITIAL_TICKETS;
+  });
+
+  const [concessions, setConcessions] = useState(() => {
+    const saved = localStorage.getItem('lora_concessions');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_concessions', JSON.stringify(INITIAL_CONCESSIONS));
+    return INITIAL_CONCESSIONS;
+  });
+
+  // Sync state helpers
+  const updateTicketsState = (newTickets) => {
+    setTickets(newTickets);
+    localStorage.setItem('lora_tickets', JSON.stringify(newTickets));
+  };
+
+  const updateConcessionsState = (newConcessions) => {
+    setConcessions(newConcessions);
+    localStorage.setItem('lora_concessions', JSON.stringify(newConcessions));
+  };
+
+  // Concessions Cart State
   const [cart, setCart] = useState({});
   const [showConcessionsSuccess, setShowConcessionsSuccess] = useState(false);
 
@@ -41,9 +83,13 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
   // Search State for Ticketing
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleLogout = () => {
-    logout();
-    onBackHome();
+  // Toast Notification State
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
+  const triggerToast = (msg, type = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   // Concessions Logic
@@ -62,13 +108,24 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
 
   const cartTotal = useMemo(() => {
     return Object.entries(cart).reduce((sum, [itemId, qty]) => {
-      const item = CONCESSIONS_ITEMS.find((i) => i.id === parseInt(itemId));
+      const item = concessions.find((i) => i.id === parseInt(itemId));
       return sum + (item ? item.price * qty : 0);
     }, 0);
-  }, [cart]);
+  }, [cart, concessions]);
 
   const handleCheckoutConcessions = () => {
     if (Object.keys(cart).length === 0) return;
+
+    // Mutate state to increment salesCount in localStorage concessions catalog
+    const updatedConcessions = concessions.map(c => {
+      const qtyInCart = cart[c.id];
+      if (qtyInCart) {
+        return { ...c, salesCount: c.salesCount + qtyInCart };
+      }
+      return c;
+    });
+
+    updateConcessionsState(updatedConcessions);
     setShowConcessionsSuccess(true);
   };
 
@@ -77,42 +134,79 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
     setShowConcessionsSuccess(false);
   };
 
-  // Ticket Validation Logic
+  // Ticket Validation Live Verification
   const handleValidateTicket = (e) => {
     e.preventDefault();
     if (!ticketCode.trim()) return;
 
-    // Simulate database lookup of the check-in code
     const code = ticketCode.trim().toUpperCase();
-    if (code.startsWith('LORA-') && code.length >= 8) {
-      setValidationResult({
-        success: true,
-        code,
-        movie: 'Dinh Thinh La Yeu',
-        seats: 'F4, F5',
-        cinema: 'Lora Nguyen Du',
-        showtime: '19:30 | Hôm nay',
-        message: 'Vé hợp lệ. Cho phép khách hàng vào phòng chiếu.'
-      });
+    
+    // Read fresh list from localStorage to avoid stale state issues
+    const freshTicketsStr = localStorage.getItem('lora_tickets');
+    const freshTickets = freshTicketsStr ? JSON.parse(freshTicketsStr) : tickets;
+
+    const matchedTicketIndex = freshTickets.findIndex(t => t.id.toUpperCase() === code);
+
+    if (matchedTicketIndex !== -1) {
+      const ticket = freshTickets[matchedTicketIndex];
+      
+      if (ticket.status === 'DA_KIEM_TRA') {
+        setValidationResult({
+          success: false,
+          code,
+          message: 'Canh bao: Ve nay da duoc check-in tu truoc do!'
+        });
+      } else {
+        // Mutate status to DA_KIEM_TRA
+        const updatedTickets = [...freshTickets];
+        updatedTickets[matchedTicketIndex] = { ...ticket, status: 'DA_KIEM_TRA' };
+        updateTicketsState(updatedTickets);
+
+        setValidationResult({
+          success: true,
+          code,
+          movie: ticket.movieTitle,
+          seats: ticket.seats.join(', '),
+          cinema: ticket.theaterName,
+          showtime: `${ticket.time} | ${ticket.date}`,
+          message: 'Ve hop le! Check-in thanh cong. Cho phep khach hang vao phong chieu.'
+        });
+        triggerToast('Check-in ve thanh cong!');
+      }
     } else {
       setValidationResult({
         success: false,
         code,
-        message: 'Mã vé không tồn tại hoặc đã được sử dụng trước đó!'
+        message: 'Ma ve khong ton tai trong he thong hoac chua duoc thanh toan!'
       });
     }
   };
 
-  // Ticketing Search Logic
+  // Ticketing Search Logic (Now showing movies only)
   const filteredMovies = useMemo(() => {
-    return MOVIES.filter((m) => 
+    return movies.filter((m) => 
       m.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
       m.status === 'NOW_SHOWING'
     );
-  }, [searchQuery]);
+  }, [movies, searchQuery]);
+
+  const handleLogout = () => {
+    logout();
+    onBackHome();
+  };
 
   return (
-    <div className="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col lg:flex-row">
+    <div className="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col lg:flex-row relative">
+      {/* Toast popup */}
+      {toastMessage && (
+        <div className={`fixed top-6 right-6 z-50 py-3.5 px-6 rounded-xl shadow-2xl flex items-center gap-2 border font-bold text-sm text-white animate-bounce ${
+          toastType === 'success' ? 'bg-emerald-600 border-emerald-500' : 'bg-red-600 border-red-500'
+        }`}>
+          <AlertCircle className="w-4.5 h-4.5" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Sidebar Operational Staff Panel */}
       <aside className="w-full lg:w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col justify-between shrink-0">
         <div>
@@ -184,7 +278,7 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
         </div>
 
         {/* User profile controls footer */}
-        <div className="p-4 border-t border-zinc-800 space-y-2">
+        <div className="p-4 border-t border-zinc-800 space-y-2 mt-auto">
           <div className="px-4 py-2">
             <p className="text-xs text-zinc-500 font-bold uppercase">Nhân viên</p>
             <p className="text-sm font-bold text-white truncate">{user?.fullName || 'Frontline Staff'}</p>
@@ -209,7 +303,7 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
       </aside>
 
       {/* Content Space */}
-      <main className="flex-grow p-6 md:p-10 space-y-8 overflow-y-auto">
+      <main className="flex-grow p-6 md:p-10 space-y-8 overflow-y-auto lg:max-h-screen">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide uppercase">
@@ -234,56 +328,68 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
           {activeTab === 'ticketing' && (
             <div className="space-y-6">
               <div className="flex items-center gap-3 max-w-md bg-zinc-950 border border-zinc-850 px-4 py-2.5 rounded-xl">
-                <Search className="w-4 h-4 text-zinc-505" />
+                <Search className="w-4 h-4 text-zinc-500" />
                 <input
                   type="text"
                   placeholder="Tìm nhanh phim đang chiếu..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-zinc-600"
+                  className="bg-transparent border-none outline-none text-xs w-full text-white placeholder-zinc-600 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredMovies.map((movie) => (
-                  <div key={movie.id} className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-4">
-                    <img
-                      src={movie.posterUrl}
-                      alt={movie.title}
-                      className="w-20 h-28 object-cover rounded-xl border border-zinc-800 shrink-0"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80';
-                      }}
-                    />
-                    <div className="flex flex-col justify-between flex-grow">
-                      <div>
-                        <h3 className="font-black text-white text-base leading-tight mb-1">{movie.title}</h3>
-                        <p className="text-zinc-500 text-xs">{movie.genre} | {movie.duration}</p>
-                      </div>
+                {filteredMovies.map((movie) => {
+                  const movieShowtimes = showtimes.filter(st => st.movieId === movie.id);
+                  
+                  return (
+                    <div key={movie.id} className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 flex gap-4">
+                      <img
+                        src={movie.posterUrl}
+                        alt={movie.title}
+                        className="w-20 h-28 object-cover rounded-xl border border-zinc-850 shrink-0"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div className="flex flex-col justify-between flex-grow">
+                        <div>
+                          <h3 className="font-black text-white text-sm leading-tight mb-1">{movie.title}</h3>
+                          <p className="text-zinc-500 text-[11px]">{movie.genres.join(', ')} | {movie.duration}</p>
+                        </div>
 
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {SHOWTIMES.slice(0, 3).map((time) => (
-                          <button
-                            key={time}
-                            onClick={() => onTicketingSelect({
-                              movieId: movie.id,
-                              movieTitle: movie.title,
-                              date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-                              fullDate: new Date().toLocaleDateString('vi-VN'),
-                              cinema: 'Lora Nguyen Du',
-                              time,
-                              format: '2D DIGITAL'
-                            })}
-                            className="bg-brand-coral hover:bg-opacity-95 text-white font-extrabold text-[10px] py-1.5 px-3 rounded-lg uppercase tracking-wider transition-all"
-                          >
-                            Mua {time}
-                          </button>
-                        ))}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {movieShowtimes.length > 0 ? (
+                            movieShowtimes.map((st) => {
+                              const t = theaters.find(th => th.id === st.theaterId);
+                              const h = t?.halls.find(hall => hall.id === st.hallId);
+                              
+                              return (
+                                <button
+                                  key={st.id}
+                                  onClick={() => onTicketingSelect({
+                                    movieId: movie.id,
+                                    movieTitle: movie.title,
+                                    date: st.date,
+                                    cinema: `${t?.name} - ${h?.name}`,
+                                    time: st.time,
+                                    format: h?.format || '2D DIGITAL'
+                                  })}
+                                  className="bg-brand-coral hover:bg-opacity-95 text-white font-extrabold text-[9px] py-1.5 px-2.5 rounded uppercase tracking-wider transition-all"
+                                >
+                                  {st.time} ({h?.name})
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <span className="text-[10px] text-zinc-600 italic">Khong co suat chieu</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -295,11 +401,11 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
               <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-lg font-black text-white mb-2 uppercase tracking-wide">Thực đơn bắp nước</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CONCESSIONS_ITEMS.map((item) => (
+                  {concessions.map((item) => (
                     <div key={item.id} className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center">
                       <div>
                         <h4 className="font-bold text-white text-sm">{item.name}</h4>
-                        <p className="text-zinc-500 text-xs mt-0.5">{item.desc}</p>
+                        <p className="text-zinc-500 text-xs mt-0.5">{item.details}</p>
                         <p className="text-brand-coral font-black text-sm mt-2">{item.price.toLocaleString('vi-VN')}đ</p>
                       </div>
 
@@ -335,7 +441,7 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
                   ) : (
                     <div className="space-y-3 max-h-[220px] overflow-y-auto scrollbar-thin">
                       {Object.entries(cart).map(([itemId, qty]) => {
-                        const item = CONCESSIONS_ITEMS.find((i) => i.id === parseInt(itemId));
+                        const item = concessions.find((i) => i.id === parseInt(itemId));
                         if (!item) return null;
                         return (
                           <div key={itemId} className="flex justify-between text-xs">
@@ -387,10 +493,10 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
                   <div className="flex gap-3">
                     <input
                       type="text"
-                      placeholder="Nhập mã vé (VD: LORA-8492-9582)"
+                      placeholder="Nhập mã vé (VD: TKT-8492-9582)"
                       value={ticketCode}
                       onChange={(e) => setTicketCode(e.target.value)}
-                      className="bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-brand-coral flex-grow"
+                      className="bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-brand-coral flex-grow"
                     />
                     <button
                       type="submit"
@@ -419,7 +525,7 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
                       <h4 className="font-black text-white text-base">
                         {validationResult.success ? 'KẾT QUẢ: HỢP LỆ' : 'KẾT QUẢ: KHÔNG HỢP LỆ'}
                       </h4>
-                      <p className="text-sm">{validationResult.message}</p>
+                      <p className="text-xs">{validationResult.message}</p>
 
                       {validationResult.success && (
                         <div className="bg-zinc-950/40 rounded-xl p-4 text-xs space-y-1.5 mt-4 text-zinc-300">
@@ -444,7 +550,8 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
                 <table className="w-full text-left text-sm text-zinc-400">
                   <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
                     <tr>
-                      <th className="py-3 px-4">Cụm Rạp</th>
+                      <th className="py-3 px-4">Cum rap</th>
+                      <th className="py-3 px-4">Phong chieu</th>
                       <th className="py-3 px-4">Phim</th>
                       <th className="py-3 px-4">Định Dạng</th>
                       <th className="py-3 px-4">Khung Giờ</th>
@@ -452,21 +559,28 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
-                    {CINEMA_CLUSTERS.map((cinema, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-950/20">
-                        <td className="py-3.5 px-4 font-bold text-white">{cinema}</td>
-                        <td className="py-3.5 px-4 text-zinc-200">Dinh Thinh La Yeu</td>
-                        <td className="py-3.5 px-4"><span className="text-brand-coral font-black text-xs">2D DIGITAL</span></td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-brand-yellow">
-                          {SHOWTIMES.join(', ')}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
-                            Đang mở
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {showtimes.map((st, idx) => {
+                      const movie = movies.find(m => m.id === st.movieId);
+                      const t = theaters.find(th => th.id === st.theaterId);
+                      const h = t?.halls.find(hall => hall.id === st.hallId);
+
+                      return (
+                        <tr key={idx} className="hover:bg-zinc-950/20">
+                          <td className="py-3.5 px-4 font-bold text-white">{t?.name || 'Unknown'}</td>
+                          <td className="py-3.5 px-4 text-zinc-300">{h?.name || 'Unknown'}</td>
+                          <td className="py-3.5 px-4 font-semibold text-zinc-100">{movie?.title || 'Unknown'}</td>
+                          <td className="py-3.5 px-4"><span className="text-brand-coral font-black text-[11px]">{h?.format || '2D DIGITAL'}</span></td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-brand-yellow">
+                            {st.time} | {st.date}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
+                              Đang mở
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -486,7 +600,7 @@ export default function EmployeeDashboardView({ onBackHome, onTicketingSelect })
             
             <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 text-left space-y-2 text-xs mb-6 text-zinc-300">
               {Object.entries(cart).map(([itemId, qty]) => {
-                const item = CONCESSIONS_ITEMS.find((i) => i.id === parseInt(itemId));
+                const item = concessions.find((i) => i.id === parseInt(itemId));
                 if (!item) return null;
                 return (
                   <div key={itemId} className="flex justify-between">

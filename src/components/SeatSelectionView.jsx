@@ -82,6 +82,8 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
     return val.toLocaleString('vi-VN') + 'đ';
   };
 
+  const { user } = useAuth();
+
   const handleCheckoutSubmit = () => {
     if (selectedSeats.length === 0) return;
 
@@ -97,6 +99,27 @@ export default function SeatSelectionView({ bookingData, onBack, onRequireLogin 
       }
       return;
     }
+
+    // Generate new ticket object
+    const newTicket = {
+      id: `TKT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
+      customerName: user?.fullName || 'Khach Vang Lai',
+      customerEmail: user?.email || 'customer@gmail.com',
+      movieTitle: movieTitle,
+      theaterName: cinema,
+      time: time,
+      date: date,
+      seats: selectedSeats,
+      totalAmount: totalAmount,
+      status: 'CHUA_KIEM_TRA',
+      timestamp: new Date().toISOString()
+    };
+
+    // Save to localStorage
+    const savedTickets = localStorage.getItem('lora_tickets');
+    const ticketList = savedTickets ? JSON.parse(savedTickets) : [];
+    ticketList.push(newTicket);
+    localStorage.setItem('lora_tickets', JSON.stringify(ticketList));
 
     setShowSuccessModal(true);
   };

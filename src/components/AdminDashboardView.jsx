@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, 
@@ -8,7 +8,6 @@ import {
   Users, 
   Settings, 
   Ticket, 
-  ShieldCheck, 
   ChevronDown, 
   ChevronRight, 
   LogOut, 
@@ -16,9 +15,21 @@ import {
   Percent, 
   Trash2, 
   Edit3, 
-  PlusCircle
+  PlusCircle,
+  Search,
+  X,
+  AlertCircle
 } from 'lucide-react';
-import { MOVIES } from '../data/mockData';
+import { 
+  INITIAL_MOVIES, 
+  INITIAL_ACTORS, 
+  INITIAL_THEATERS, 
+  INITIAL_SHOWTIMES, 
+  INITIAL_TICKETS, 
+  INITIAL_CONCESSIONS, 
+  INITIAL_CUSTOMERS, 
+  INITIAL_EMPLOYEES 
+} from '../data/mockDashboardData';
 
 export default function AdminDashboardView({ onBackHome }) {
   const { user, userRole, logout } = useAuth();
@@ -29,7 +40,7 @@ export default function AdminDashboardView({ onBackHome }) {
   // Collapsible sidebar section states
   const [expandedSections, setExpandedSections] = useState({
     noiDung: true,
-    coSo: false,
+    coSo: true,
     kinhDoanh: false,
     nguoiDung: false,
     cauHinh: false,
@@ -43,27 +54,400 @@ export default function AdminDashboardView({ onBackHome }) {
     }));
   };
 
-  // Mock Operational Metrics
-  const metrics = [
-    {
-      title: 'Doanh thu hôm nay',
-      value: '24.840.000đ',
-      icon: <CircleDollarSign className="w-8 h-8 text-brand-coral" />,
-      change: '+12.5% so với hôm qua'
-    },
-    {
-      title: 'Tổng số vé đã bán',
-      value: '228 vé',
-      icon: <Ticket className="w-8 h-8 text-brand-yellow" />,
-      change: '18 phòng chiếu đang hoạt động'
-    },
-    {
-      title: 'Tỷ lệ lấp đầy phòng',
-      value: '84.2%',
-      icon: <Percent className="w-8 h-8 text-emerald-500" />,
-      change: '+4.8% trong khung giờ vàng'
+  // State initialization backed by localStorage
+  const [movies, setMovies] = useState(() => {
+    const saved = localStorage.getItem('lora_movies');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_movies', JSON.stringify(INITIAL_MOVIES));
+    return INITIAL_MOVIES;
+  });
+
+  const [actors, setActors] = useState(() => {
+    const saved = localStorage.getItem('lora_actors');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_actors', JSON.stringify(INITIAL_ACTORS));
+    return INITIAL_ACTORS;
+  });
+
+  const [theaters, setTheaters] = useState(() => {
+    const saved = localStorage.getItem('lora_theaters');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_theaters', JSON.stringify(INITIAL_THEATERS));
+    return INITIAL_THEATERS;
+  });
+
+  const [showtimes, setShowtimes] = useState(() => {
+    const saved = localStorage.getItem('lora_showtimes');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_showtimes', JSON.stringify(INITIAL_SHOWTIMES));
+    return INITIAL_SHOWTIMES;
+  });
+
+  const [tickets] = useState(() => {
+    const saved = localStorage.getItem('lora_tickets');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_tickets', JSON.stringify(INITIAL_TICKETS));
+    return INITIAL_TICKETS;
+  });
+
+  const [concessions] = useState(() => {
+    const saved = localStorage.getItem('lora_concessions');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_concessions', JSON.stringify(INITIAL_CONCESSIONS));
+    return INITIAL_CONCESSIONS;
+  });
+
+  const [customers, setCustomers] = useState(() => {
+    const saved = localStorage.getItem('lora_customers');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_customers', JSON.stringify(INITIAL_CUSTOMERS));
+    return INITIAL_CUSTOMERS;
+  });
+
+  const [employees, setEmployees] = useState(() => {
+    const saved = localStorage.getItem('lora_employees');
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem('lora_employees', JSON.stringify(INITIAL_EMPLOYEES));
+    return INITIAL_EMPLOYEES;
+  });
+
+  // Local helper state modifiers
+  const updateMoviesState = (newMovies) => {
+    setMovies(newMovies);
+    localStorage.setItem('lora_movies', JSON.stringify(newMovies));
+  };
+
+  const updateActorsState = (newActors) => {
+    setActors(newActors);
+    localStorage.setItem('lora_actors', JSON.stringify(newActors));
+  };
+
+  const updateShowtimesState = (newShowtimes) => {
+    setShowtimes(newShowtimes);
+    localStorage.setItem('lora_showtimes', JSON.stringify(newShowtimes));
+  };
+
+  const updateTheatersState = (newTheaters) => {
+    setTheaters(newTheaters);
+    localStorage.setItem('lora_theaters', JSON.stringify(newTheaters));
+  };
+
+  const updateCustomersState = (newCustomers) => {
+    setCustomers(newCustomers);
+    localStorage.setItem('lora_customers', JSON.stringify(newCustomers));
+  };
+
+  const updateEmployeesState = (newEmployees) => {
+    setEmployees(newEmployees);
+    localStorage.setItem('lora_employees', JSON.stringify(newEmployees));
+  };
+
+  // Toast Notification State
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success'); // success or error
+  const triggerToast = (msg, type = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  // Search filter states
+  const [movieSearch, setMovieSearch] = useState('');
+  const [actorSearch, setActorSearch] = useState('');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+
+  // Selected states for detail view (Theater/Hall detail view)
+  const [selectedTheaterId, setSelectedTheaterId] = useState(1);
+
+  // Modal forms states
+  const [movieModalOpen, setMovieModalOpen] = useState(false);
+  const [editingMovie, setEditingMovie] = useState(null);
+  const [movieForm, setMovieForm] = useState({ title: '', duration: '', ageRating: 'P', status: 'NOW_SHOWING', genres: '', synopsis: '', releaseYear: 2026 });
+
+  const [actorModalOpen, setActorModalOpen] = useState(false);
+  const [editingActor, setEditingActor] = useState(null);
+  const [actorForm, setActorForm] = useState({ name: '', nationality: '', starredFilms: '', birthdate: '' });
+
+  const [showtimeModalOpen, setShowtimeModalOpen] = useState(false);
+  const [showtimeForm, setShowtimeForm] = useState({ movieId: '', theaterId: '', hallId: '', date: '', time: '', price: 80000 });
+  const [showtimeError, setShowtimeError] = useState('');
+
+  // 1. Movies CRUD Handlers
+  const handleOpenAddMovie = () => {
+    setEditingMovie(null);
+    setMovieForm({ title: '', duration: '120 phut', ageRating: 'P', status: 'NOW_SHOWING', genres: 'Hanh Dong', synopsis: '', releaseYear: 2026 });
+    setMovieModalOpen(true);
+  };
+
+  const handleOpenEditMovie = (movie) => {
+    setEditingMovie(movie);
+    setMovieForm({
+      title: movie.title,
+      duration: movie.duration,
+      ageRating: movie.ageRating,
+      status: movie.status,
+      genres: movie.genres.join(', '),
+      synopsis: movie.synopsis || '',
+      releaseYear: movie.releaseYear || 2026
+    });
+    setMovieModalOpen(true);
+  };
+
+  const handleSaveMovie = (e) => {
+    e.preventDefault();
+    if (!movieForm.title || !movieForm.duration) {
+      triggerToast('Vui long dien day du thong tin!', 'error');
+      return;
     }
-  ];
+
+    const processedMovie = {
+      title: movieForm.title,
+      duration: movieForm.duration,
+      ageRating: movieForm.ageRating,
+      status: movieForm.status,
+      genres: movieForm.genres.split(',').map(g => g.trim()),
+      synopsis: movieForm.synopsis,
+      releaseYear: parseInt(movieForm.releaseYear) || 2026,
+      rating: editingMovie ? editingMovie.rating : 4.5,
+      posterUrl: editingMovie ? editingMovie.posterUrl : 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80',
+      trailerId: editingMovie ? editingMovie.trailerId : 'eHp3MbsQgzk'
+    };
+
+    if (editingMovie) {
+      const updated = movies.map(m => m.id === editingMovie.id ? { ...processedMovie, id: m.id } : m);
+      updateMoviesState(updated);
+      triggerToast('Cap nhat thong tin phim thanh cong!');
+    } else {
+      const newMovie = { ...processedMovie, id: Date.now() };
+      updateMoviesState([...movies, newMovie]);
+      triggerToast('Them phim moi thanh cong!');
+    }
+    setMovieModalOpen(false);
+  };
+
+  const handleDeleteMovie = (id) => {
+    if (confirm('Ban co chac chan muon xoa phim nay?')) {
+      const updated = movies.filter(m => m.id !== id);
+      updateMoviesState(updated);
+      triggerToast('Da xoa phim khoi danh sach!');
+    }
+  };
+
+  // 2. Actors CRUD Handlers
+  const handleOpenAddActor = () => {
+    setEditingActor(null);
+    setActorForm({ name: '', nationality: '', starredFilms: '', birthdate: '' });
+    setActorModalOpen(true);
+  };
+
+  const handleOpenEditActor = (actor) => {
+    setEditingActor(actor);
+    setActorForm({
+      name: actor.name,
+      nationality: actor.nationality,
+      starredFilms: actor.starredFilms.join(', '),
+      birthdate: actor.birthdate || ''
+    });
+    setActorModalOpen(true);
+  };
+
+  const handleSaveActor = (e) => {
+    e.preventDefault();
+    if (!actorForm.name || !actorForm.nationality) {
+      triggerToast('Vui long dien ten va quoc tich!', 'error');
+      return;
+    }
+
+    const processedActor = {
+      name: actorForm.name,
+      nationality: actorForm.nationality,
+      starredFilms: actorForm.starredFilms.split(',').map(f => f.trim()),
+      birthdate: actorForm.birthdate,
+      imageUrl: editingActor ? editingActor.imageUrl : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80'
+    };
+
+    if (editingActor) {
+      const updated = actors.map(a => a.id === editingActor.id ? { ...processedActor, id: a.id } : a);
+      updateActorsState(updated);
+      triggerToast('Cap nhat dien vien thanh cong!');
+    } else {
+      const newActor = { ...processedActor, id: Date.now() };
+      updateActorsState([...actors, newActor]);
+      triggerToast('Them dien vien thanh cong!');
+    }
+    setActorModalOpen(false);
+  };
+
+  const handleDeleteActor = (id) => {
+    if (confirm('Ban co chac chan muon xoa dien vien nay?')) {
+      const updated = actors.filter(a => a.id !== id);
+      updateActorsState(updated);
+      triggerToast('Da xoa dien vien!');
+    }
+  };
+
+  // 3. Showtimes CRUD & Overlap detection
+  const handleOpenAddShowtime = () => {
+    setShowtimeForm({
+      movieId: movies[0]?.id || '',
+      theaterId: theaters[0]?.id || '',
+      hallId: theaters[0]?.halls[0]?.id || '',
+      date: new Date().toISOString().split('T')[0],
+      time: '19:30',
+      price: 80000
+    });
+    setShowtimeError('');
+    setShowtimeModalOpen(true);
+  };
+
+  const handleSaveShowtime = (e) => {
+    e.preventDefault();
+    setShowtimeError('');
+
+    // Showtime Overlap detection:
+    // A hall cannot host multiple screenings at the exact same date and time.
+    const isOverlap = showtimes.some(st => 
+      st.hallId.toString() === showtimeForm.hallId.toString() &&
+      st.date === showtimeForm.date &&
+      st.time === showtimeForm.time
+    );
+
+    if (isOverlap) {
+      setShowtimeError('Trung lich! Phong chieu nay da duoc dang ky mot suat chieu vao dung khung gio da chon.');
+      return;
+    }
+
+    const newShowtime = {
+      id: Date.now(),
+      movieId: parseInt(showtimeForm.movieId),
+      theaterId: parseInt(showtimeForm.theaterId),
+      hallId: showtimeForm.hallId,
+      date: showtimeForm.date,
+      time: showtimeForm.time,
+      price: parseInt(showtimeForm.price) || 80000
+    };
+
+    updateShowtimesState([...showtimes, newShowtime]);
+    triggerToast('Them suat chieu moi thanh cong!');
+    setShowtimeModalOpen(false);
+  };
+
+  const handleDeleteShowtime = (id) => {
+    if (confirm('Ban co chac chan muon xoa suat chieu nay?')) {
+      const updated = showtimes.filter(st => st.id !== id);
+      updateShowtimesState(updated);
+      triggerToast('Da xoa suat chieu!');
+    }
+  };
+
+  // 4. Theater Clusters & Halls triggers
+  const handleAddHall = (theaterId) => {
+    const name = prompt('Nhap ten phong chieu moi:');
+    if (!name) return;
+    const format = prompt('Nhap dinh dang phong chieu (2D Digital / IMAX 3D / 3D Digital):', '2D Digital');
+    const capacity = parseInt(prompt('Nhap suc chua cua phong:', '120')) || 120;
+
+    const updated = theaters.map(t => {
+      if (t.id === theaterId) {
+        return {
+          ...t,
+          halls: [
+            ...t.halls,
+            { id: `${t.id}-${t.halls.length + 1}`, name, capacity, format }
+          ]
+        };
+      }
+      return t;
+    });
+
+    updateTheatersState(updated);
+    triggerToast('Da them phong chieu moi!');
+  };
+
+  const handleRenameHall = (theaterId, hallId) => {
+    const newName = prompt('Nhap ten phong chieu moi:');
+    if (!newName) return;
+
+    const updated = theaters.map(t => {
+      if (t.id === theaterId) {
+        return {
+          ...t,
+          halls: t.halls.map(h => h.id === hallId ? { ...h, name: newName } : h)
+        };
+      }
+      return t;
+    });
+
+    updateTheatersState(updated);
+    triggerToast('Da doi ten phong chieu!');
+  };
+
+  // 5. Customer promotions
+  const handleToggleCustomerTier = (id) => {
+    const updated = customers.map(c => {
+      if (c.id === id) {
+        const newTier = c.tier === 'VIP' ? 'Standard' : 'VIP';
+        return { ...c, tier: newTier, points: newTier === 'VIP' ? Math.max(c.points, 500) : c.points };
+      }
+      return c;
+    });
+    updateCustomersState(updated);
+    triggerToast('Cap nhat hang thanh vien thanh cong!');
+  };
+
+  // 6. Payroll calculations
+  const handlePayrollApprove = () => {
+    triggerToast('Duyet chi luong thang nay thanh cong! Hoa don ke toan da duoc ket xuat.');
+  };
+
+  const handleAdjustWage = (id, newWage) => {
+    const updated = employees.map(emp => emp.id === id ? { ...emp, hourlyWage: parseInt(newWage) || 25000 } : emp);
+    updateEmployeesState(updated);
+  };
+
+  const handleAdjustMultiplier = (id, newMultiplier) => {
+    const updated = employees.map(emp => emp.id === id ? { ...emp, activeMultiplier: parseFloat(newMultiplier) || 1.0 } : emp);
+    updateEmployeesState(updated);
+  };
+
+  // Calculations for analytics overview
+  const totalRevenueVal = useMemo(() => {
+    const ticketSum = tickets.reduce((acc, t) => acc + t.totalAmount, 0);
+    const concessionSum = concessions.reduce((acc, c) => acc + (c.price * c.salesCount), 0);
+    return ticketSum + concessionSum;
+  }, [tickets, concessions]);
+
+  const totalTicketsVal = useMemo(() => {
+    return tickets.length;
+  }, [tickets]);
+
+  // Filters computed using useMemo
+  const filteredMovies = useMemo(() => {
+    return movies.filter(m => m.title.toLowerCase().includes(movieSearch.toLowerCase()));
+  }, [movies, movieSearch]);
+
+  const filteredActors = useMemo(() => {
+    return actors.filter(a => a.name.toLowerCase().includes(actorSearch.toLowerCase()));
+  }, [actors, actorSearch]);
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(t => 
+      t.id.toLowerCase().includes(ticketSearch.toLowerCase()) || 
+      t.customerName.toLowerCase().includes(ticketSearch.toLowerCase())
+    );
+  }, [tickets, ticketSearch]);
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+      c.email.toLowerCase().includes(customerSearch.toLowerCase())
+    );
+  }, [customers, customerSearch]);
+
+  const selectedTheater = useMemo(() => {
+    return theaters.find(t => t.id === selectedTheaterId) || theaters[0];
+  }, [theaters, selectedTheaterId]);
 
   const handleLogout = () => {
     logout();
@@ -71,7 +455,17 @@ export default function AdminDashboardView({ onBackHome }) {
   };
 
   return (
-    <div className="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col lg:flex-row">
+    <div className="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col lg:flex-row relative">
+      {/* Toast Notification Element */}
+      {toastMessage && (
+        <div className={`fixed top-6 right-6 z-50 py-3.5 px-6 rounded-xl shadow-2xl flex items-center gap-2 border font-bold text-sm text-white animate-bounce ${
+          toastType === 'success' ? 'bg-emerald-600 border-emerald-500' : 'bg-red-600 border-red-500'
+        }`}>
+          <AlertCircle className="w-4.5 h-4.5" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Sidebar System Navigation Panel */}
       <aside className="w-full lg:w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col justify-between shrink-0">
         <div>
@@ -159,13 +553,7 @@ export default function AdminDashboardView({ onBackHome }) {
                     onClick={() => setActiveTab('clusters')}
                     className={`w-full text-left py-2 px-3 rounded text-[11px] font-semibold block ${activeTab === 'clusters' ? 'text-brand-coral bg-white/5 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    Quản lý cụm rạp
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('halls')}
-                    className={`w-full text-left py-2 px-3 rounded text-[11px] font-semibold block ${activeTab === 'halls' ? 'text-brand-coral bg-white/5 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Quản lý phòng chiếu
+                    Cụm rạp & Phòng chiếu
                   </button>
                 </div>
               )}
@@ -209,7 +597,7 @@ export default function AdminDashboardView({ onBackHome }) {
               >
                 <div className="flex items-center gap-3">
                   <Users className="w-4 h-4 shrink-0" />
-                  <span>Quản Lý Người Dùng</span>
+                  <span>Nhân Sự & Khách Hàng</span>
                 </div>
                 {expandedSections.nguoiDung ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               </button>
@@ -239,7 +627,7 @@ export default function AdminDashboardView({ onBackHome }) {
               >
                 <div className="flex items-center gap-3">
                   <Settings className="w-4 h-4 shrink-0" />
-                  <span>Cấu Hình Phim</span>
+                  <span>Cấu Hình & Bảo Mật</span>
                 </div>
                 {expandedSections.cauHinh ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               </button>
@@ -260,54 +648,11 @@ export default function AdminDashboardView({ onBackHome }) {
                 </div>
               )}
             </div>
-
-            {/* Đặt Vé Link */}
-            <button
-              onClick={() => setActiveTab('bookings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase transition-all duration-200 ${
-                activeTab === 'bookings'
-                  ? 'bg-brand-coral/10 text-brand-coral border-l-4 border-brand-coral'
-                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-              }`}
-            >
-              <Ticket className="w-4 h-4 shrink-0" />
-              <span>Đặt Vé (Giao dịch)</span>
-            </button>
-
-            {/* Bảo Mật & Phân Quyền Section */}
-            <div className="space-y-1">
-              <button
-                onClick={() => toggleSection('baoMat')}
-                className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold text-zinc-400 hover:bg-zinc-800/50 hover:text-white uppercase"
-              >
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>Bảo Mật & Phân Quyền</span>
-                </div>
-                {expandedSections.baoMat ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              </button>
-              {expandedSections.baoMat && (
-                <div className="pl-8 space-y-1">
-                  <button
-                    onClick={() => setActiveTab('keys')}
-                    className={`w-full text-left py-2 px-3 rounded text-[11px] font-semibold block ${activeTab === 'keys' ? 'text-brand-coral bg-white/5 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Danh sách khoá bảo mật
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('credentials')}
-                    className={`w-full text-left py-2 px-3 rounded text-[11px] font-semibold block ${activeTab === 'credentials' ? 'text-brand-coral bg-white/5 font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Quản lý tài khoản
-                  </button>
-                </div>
-              )}
-            </div>
           </nav>
         </div>
 
         {/* Footer controls */}
-        <div className="p-4 border-t border-zinc-800 space-y-2">
+        <div className="p-4 border-t border-zinc-800 space-y-2 mt-auto">
           <div className="px-4 py-2">
             <p className="text-xs text-zinc-500 font-bold uppercase">Người dùng</p>
             <p className="text-sm font-bold text-white truncate">{user?.fullName || 'Administrator'}</p>
@@ -332,7 +677,7 @@ export default function AdminDashboardView({ onBackHome }) {
       </aside>
 
       {/* Main Content Space */}
-      <main className="flex-grow p-6 md:p-10 space-y-8 overflow-y-auto">
+      <main className="flex-grow p-6 md:p-10 space-y-8 overflow-y-auto lg:max-h-screen">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide uppercase">
@@ -340,17 +685,13 @@ export default function AdminDashboardView({ onBackHome }) {
               {activeTab === 'movies' && 'DANH SÁCH PHIM'}
               {activeTab === 'actors' && 'QUẢN LÝ DIỄN VIÊN'}
               {activeTab === 'showtimes' && 'QUẢN LÝ LỊCH CHIẾU'}
-              {activeTab === 'clusters' && 'CỤM RẠP HỆ THỐNG'}
-              {activeTab === 'halls' && 'QUẢN LÝ PHÒNG CHIẾU'}
+              {activeTab === 'clusters' && 'CỤM RẠP & PHÒNG CHIẾU'}
               {activeTab === 'tickets' && 'LỊCH SỬ VÉ BÁN'}
               {activeTab === 'concessions' && 'KHO BẮP NƯỚC'}
               {activeTab === 'customers' && 'DANH SÁCH THÀNH VIÊN'}
               {activeTab === 'payroll' && 'BẢNG LƯƠNG NHÂN VIÊN'}
               {activeTab === 'delays' && 'CẤU HÌNH TRỄ LỊCH CHIẾU'}
               {activeTab === 'pricing' && 'HỆ SỐ PHỤ THU GIÁ VÉ'}
-              {activeTab === 'bookings' && 'DUYỆT GIAO DỊCH CHỜ'}
-              {activeTab === 'keys' && 'KHOÁ BẢO MẬT HỆ THỐNG'}
-              {activeTab === 'credentials' && 'QUẢN LÝ TÀI KHOẢN'}
             </h1>
             <p className="text-zinc-500 text-xs uppercase tracking-wider mt-1">
               Báo cáo hiệu suất và công cụ cấu hình hệ thống LoraFilm
@@ -363,20 +704,44 @@ export default function AdminDashboardView({ onBackHome }) {
 
         {/* Operational Snapshots */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {metrics.map((item, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
-              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
-                {item.icon}
-              </div>
-              <div>
-                <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
-                  {item.title}
-                </span>
-                <span className="text-2xl font-black text-white block mb-0.5">{item.value}</span>
-                <span className="text-[10px] text-zinc-400 block font-semibold">{item.change}</span>
-              </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+              <CircleDollarSign className="w-8 h-8 text-brand-coral" />
             </div>
-          ))}
+            <div>
+              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                Doanh thu tong hop
+              </span>
+              <span className="text-2xl font-black text-white block mb-0.5">{totalRevenueVal.toLocaleString('vi-VN')}đ</span>
+              <span className="text-[10px] text-zinc-400 block font-semibold">+12.5% so voi hom qua</span>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+              <Ticket className="w-8 h-8 text-brand-yellow" />
+            </div>
+            <div>
+              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                Ve ban tai quay
+              </span>
+              <span className="text-2xl font-black text-white block mb-0.5">{totalTicketsVal} ve</span>
+              <span className="text-[10px] text-zinc-400 block font-semibold">{theaters.reduce((acc, t) => acc + t.halls.length, 0)} phong chieu dang hoat dong</span>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5 shadow-lg">
+            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+              <Percent className="w-8 h-8 text-emerald-500" />
+            </div>
+            <div>
+              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">
+                Ty le lap day phong
+              </span>
+              <span className="text-2xl font-black text-white block mb-0.5">84.2%</span>
+              <span className="text-[10px] text-zinc-400 block font-semibold">+4.8% trong khung gio vang</span>
+            </div>
+          </div>
         </div>
 
         {/* Central Display Panels */}
@@ -393,51 +758,61 @@ export default function AdminDashboardView({ onBackHome }) {
                 <table className="w-full text-left text-sm text-zinc-400">
                   <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
                     <tr>
-                      <th className="py-3 px-4">Khách hàng</th>
+                      <th className="py-3 px-4">Ma ve</th>
+                      <th className="py-3 px-4">Khach hang</th>
                       <th className="py-3 px-4">Phim</th>
-                      <th className="py-3 px-4">Suất chiếu</th>
-                      <th className="py-3 px-4">Ghế</th>
-                      <th className="py-3 px-4">Tổng tiền</th>
-                      <th className="py-3 px-4">Trạng thái</th>
+                      <th className="py-3 px-4">Suat chieu</th>
+                      <th className="py-3 px-4">Ghe</th>
+                      <th className="py-3 px-4">Tong tien</th>
+                      <th className="py-3 px-4">Trang thai</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
-                    <tr>
-                      <td className="py-3.5 px-4 font-bold text-white">Lê Văn Sơn</td>
-                      <td className="py-3.5 px-4">John Wick: Ballerina</td>
-                      <td className="py-3.5 px-4 font-semibold text-brand-coral">19:30 | Hôm nay</td>
-                      <td className="py-3.5 px-4">F4, F5</td>
-                      <td className="py-3.5 px-4 text-emerald-400 font-extrabold">220.000đ</td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
-                          Thành công
-                        </span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-3.5 px-4 font-bold text-white">Trần Thị Hoa</td>
-                      <td className="py-3.5 px-4">Dinh Thinh La Yeu</td>
-                      <td className="py-3.5 px-4 font-semibold text-brand-coral">09:30 | Hôm nay</td>
-                      <td className="py-3.5 px-4">A12</td>
-                      <td className="py-3.5 px-4 text-emerald-400 font-extrabold">80.000đ</td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
-                          Thành công
-                        </span>
-                      </td>
-                    </tr>
+                    {tickets.map(t => (
+                      <tr key={t.id}>
+                        <td className="py-3.5 px-4 font-mono text-brand-yellow font-bold">{t.id}</td>
+                        <td className="py-3.5 px-4 font-bold text-white">{t.customerName}</td>
+                        <td className="py-3.5 px-4">{t.movieTitle}</td>
+                        <td className="py-3.5 px-4 font-semibold text-brand-coral">{t.time} | {t.date}</td>
+                        <td className="py-3.5 px-4">{t.seats.join(', ')}</td>
+                        <td className="py-3.5 px-4 text-emerald-400 font-extrabold">{t.totalAmount.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                            t.status === 'DA_KIEM_TRA' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700/50'
+                          }`}>
+                            {t.status === 'DA_KIEM_TRA' ? 'Da kiem tra' : 'Chua check-in'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
 
-          {/* Movies list under Content Management */}
+          {/* Movies list CRUD view */}
           {activeTab === 'movies' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-white">Danh sách phim hiện tại</h3>
-                <button className="flex items-center gap-2 bg-brand-coral hover:bg-opacity-95 text-white text-xs font-black py-2.5 px-4 rounded-xl">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="relative w-full md:w-80">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+                    <Search className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={movieSearch}
+                    onChange={(e) => setMovieSearch(e.target.value)}
+                    placeholder="Tim kiem phim..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-brand-coral transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handleOpenAddMovie}
+                  className="flex items-center gap-2 bg-brand-coral hover:bg-opacity-95 text-white text-xs font-black py-2.5 px-4 rounded-xl"
+                >
                   <PlusCircle className="w-4 h-4" />
                   <span>THÊM PHIM MỚI</span>
                 </button>
@@ -448,18 +823,20 @@ export default function AdminDashboardView({ onBackHome }) {
                   <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
                     <tr>
                       <th className="py-3 px-4">Tên phim</th>
-                      <th className="py-3 px-4">Độ dài</th>
+                      <th className="py-3 px-4">Do dai</th>
                       <th className="py-3 px-4">Giới hạn tuổi</th>
+                      <th className="py-3 px-4">Nam phat hanh</th>
                       <th className="py-3 px-4">Trạng thái</th>
                       <th className="py-3 px-4">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
-                    {MOVIES.slice(0, 6).map((movie) => (
+                    {filteredMovies.map((movie) => (
                       <tr key={movie.id}>
                         <td className="py-3.5 px-4 font-bold text-white">{movie.title}</td>
                         <td className="py-3.5 px-4">{movie.duration}</td>
                         <td className="py-3.5 px-4 font-bold text-zinc-200">{movie.ageRating}</td>
+                        <td className="py-3.5 px-4">{movie.releaseYear}</td>
                         <td className="py-3.5 px-4">
                           <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
                             movie.status === 'NOW_SHOWING' 
@@ -471,10 +848,16 @@ export default function AdminDashboardView({ onBackHome }) {
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex gap-2">
-                            <button className="p-1.5 text-zinc-400 hover:text-white bg-zinc-950 border border-zinc-850 rounded">
+                            <button
+                              onClick={() => handleOpenEditMovie(movie)}
+                              className="p-1.5 text-zinc-400 hover:text-white bg-zinc-950 border border-zinc-800 rounded"
+                            >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
-                            <button className="p-1.5 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 rounded">
+                            <button
+                              onClick={() => handleDeleteMovie(movie.id)}
+                              className="p-1.5 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 rounded"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -487,87 +870,730 @@ export default function AdminDashboardView({ onBackHome }) {
             </div>
           )}
 
+          {/* Actor CRUD View */}
+          {activeTab === 'actors' && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="relative w-full md:w-80">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+                    <Search className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={actorSearch}
+                    onChange={(e) => setActorSearch(e.target.value)}
+                    placeholder="Tim kiem dien vien..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-brand-coral transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handleOpenAddActor}
+                  className="flex items-center gap-2 bg-brand-coral hover:bg-opacity-95 text-white text-xs font-black py-2.5 px-4 rounded-xl"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>THÊM DIỄN VIÊN</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                {filteredActors.map(actor => (
+                  <div key={actor.id} className="bg-zinc-950 border border-zinc-850 rounded-2xl overflow-hidden p-4 relative group flex flex-col justify-between">
+                    <div>
+                      <img
+                        src={actor.imageUrl}
+                        alt={actor.name}
+                        className="w-full aspect-square object-cover rounded-xl mb-3 border border-zinc-800"
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <h4 className="text-white font-bold text-sm block">{actor.name}</h4>
+                      <span className="text-[10px] text-zinc-500 uppercase font-black block mt-0.5">Quoc tich: {actor.nationality}</span>
+                      <p className="text-[11px] text-zinc-400 line-clamp-2 mt-2">
+                        Phim tham gia: {actor.starredFilms.join(', ')}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-zinc-850">
+                      <button
+                        onClick={() => handleOpenEditActor(actor)}
+                        className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-black uppercase text-zinc-300 rounded-lg flex items-center justify-center gap-1"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Sua</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteActor(actor.id)}
+                        className="flex-1 py-1.5 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 text-[10px] font-black uppercase text-red-400 rounded-lg flex items-center justify-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Xoa</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Showtimes configuration tab */}
           {activeTab === 'showtimes' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-white">Quản lý lịch chiếu</h3>
-                <button className="flex items-center gap-2 bg-brand-coral hover:bg-opacity-95 text-white text-xs font-black py-2.5 px-4 rounded-xl">
+                <h3 className="text-lg font-bold text-white">Quan ly lich chieu</h3>
+                <button
+                  onClick={handleOpenAddShowtime}
+                  className="flex items-center gap-2 bg-brand-coral hover:bg-opacity-95 text-white text-xs font-black py-2.5 px-4 rounded-xl"
+                >
                   <PlusCircle className="w-4 h-4" />
                   <span>THÊM SUẤT CHIẾU</span>
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-brand-yellow font-black">2D DIGITAL | Rạp Lora Nguyễn Du</span>
-                    <h4 className="font-bold text-white text-base">Dinh Thinh La Yeu (19:30)</h4>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-lg">
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 rounded-lg">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-brand-coral font-black">IMAX 3D | Rạp Lora Thảo Điền</span>
-                    <h4 className="font-bold text-white text-base">John Wick: Ballerina (13:15)</h4>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-lg">
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 rounded-lg">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {showtimes.map((st) => {
+                  const movie = movies.find(m => m.id === st.movieId);
+                  const theater = theaters.find(t => t.id === st.theaterId);
+                  const hall = theater?.halls.find(h => h.id === st.hallId);
+                  
+                  return (
+                    <div key={st.id} className="bg-zinc-950/80 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between gap-4">
+                      <div>
+                        <span className="text-[10px] text-brand-yellow font-black uppercase tracking-wider block">
+                          {hall?.format} | {theater?.name} - {hall?.name}
+                        </span>
+                        <h4 className="font-bold text-white text-base mt-1">{movie?.title || 'Unknown Film'}</h4>
+                        <p className="text-zinc-500 text-xs font-semibold mt-0.5">
+                          Khung gio: <span className="text-brand-coral font-bold">{st.time}</span> | Ngay: {st.date} | Gia: {st.price.toLocaleString('vi-VN')}đ
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteShowtime(st.id)}
+                        className="p-2.5 text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/40 rounded-xl shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Bookings validation tab */}
-          {activeTab === 'bookings' && (
+          {/* Master Detail clusters view */}
+          {activeTab === 'clusters' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-white mb-4">Giao dịch vé chờ phê duyệt</h3>
-              
-              <div className="bg-zinc-950/60 border border-zinc-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <span className="text-xs text-brand-yellow font-black">YÊU CẦU DUYỆT ĐẶT VÉ</span>
-                  <p className="text-white font-bold mt-1">Khách hàng: Phạm Minh Đức (member@gmail.com)</p>
-                  <p className="text-zinc-400 text-xs mt-0.5">Phim: Buon Than Ban Thanh | Ghế: J5, J6 | Giá: 220.000đ</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Master: Theater List */}
+                <div className="space-y-3">
+                  <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block">Danh sach cum rap</span>
+                  {theaters.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTheaterId(t.id)}
+                      className={`w-full text-left p-4 rounded-xl border transition-all ${
+                        selectedTheaterId === t.id 
+                          ? 'bg-brand-coral/10 border-brand-coral text-white' 
+                          : 'bg-zinc-950 border-zinc-850 text-zinc-400 hover:bg-zinc-900/50'
+                      }`}
+                    >
+                      <h4 className="font-bold text-sm block">{t.name}</h4>
+                      <p className="text-[11px] text-zinc-500 truncate mt-1">{t.address}</p>
+                    </button>
+                  ))}
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs uppercase">
-                    Chấp Nhận
-                  </button>
-                  <button className="bg-zinc-900 border border-zinc-800 text-red-400 hover:bg-zinc-850 px-4 py-2 rounded-xl text-xs uppercase">
-                    Từ Chối
-                  </button>
+
+                {/* Detail: Halls list */}
+                <div className="lg:col-span-2 bg-zinc-950/50 border border-zinc-850 p-6 rounded-2xl space-y-6">
+                  <div className="flex justify-between items-center border-b border-zinc-850 pb-4">
+                    <div>
+                      <h3 className="font-bold text-white text-base">{selectedTheater.name}</h3>
+                      <p className="text-zinc-500 text-xs mt-0.5">{selectedTheater.address}</p>
+                    </div>
+                    <button
+                      onClick={() => handleAddHall(selectedTheater.id)}
+                      className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-black px-3.5 py-2 rounded-lg text-white"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>THEM PHONG</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {selectedTheater.halls.map(h => (
+                      <div key={h.id} className="bg-zinc-900/40 border border-zinc-850/80 p-4 rounded-xl flex items-center justify-between gap-4">
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{h.name}</h4>
+                          <span className="text-[10px] text-zinc-500 block uppercase font-bold mt-1">
+                            Dinh dang: {h.format} | Suc chua: {h.capacity} ghe
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRenameHall(selectedTheater.id, h.id)}
+                          className="py-1.5 px-3 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-[10px] font-bold text-zinc-300 rounded"
+                        >
+                          Doi ten
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Fallback View for other tabs */}
-          {!['overview', 'movies', 'showtimes', 'bookings'].includes(activeTab) && (
-            <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-              <Settings className="w-12 h-12 text-zinc-700 animate-spin" style={{ animationDuration: '6s' }} />
-              <h3 className="text-base font-bold text-zinc-400 uppercase tracking-wider">Cấu Hình Hoạt Động</h3>
-              <p className="text-zinc-600 text-xs max-w-sm">
-                Mục này đang hiển thị dữ liệu mô phỏng trong bộ nhớ đệm local của trình duyệt.
-              </p>
+          {/* Tickets list */}
+          {activeTab === 'tickets' && (
+            <div className="space-y-6">
+              <div className="relative w-full md:w-80 mb-4">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+                  <Search className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                  placeholder="Tim kiem theo ma hoac khach hang..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-brand-coral transition-colors"
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-zinc-400">
+                  <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
+                    <tr>
+                      <th className="py-3 px-4">Ma ve</th>
+                      <th className="py-3 px-4">Khach hang</th>
+                      <th className="py-3 px-4">Phim</th>
+                      <th className="py-3 px-4">Suat chieu</th>
+                      <th className="py-3 px-4">Ghe</th>
+                      <th className="py-3 px-4">Tong tien</th>
+                      <th className="py-3 px-4">Trang thai</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {filteredTickets.map(t => (
+                      <tr key={t.id}>
+                        <td className="py-3.5 px-4 font-mono text-brand-yellow font-bold">{t.id}</td>
+                        <td className="py-3.5 px-4 font-bold text-white">
+                          <div>{t.customerName}</div>
+                          <div className="text-[10px] text-zinc-500">{t.customerEmail}</div>
+                        </td>
+                        <td className="py-3.5 px-4">{t.movieTitle}</td>
+                        <td className="py-3.5 px-4 font-semibold text-brand-coral">{t.time} | {t.date}</td>
+                        <td className="py-3.5 px-4">{t.seats.join(', ')}</td>
+                        <td className="py-3.5 px-4 text-emerald-400 font-extrabold">{t.totalAmount.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                            t.status === 'DA_KIEM_TRA' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700/50'
+                          }`}>
+                            {t.status === 'DA_KIEM_TRA' ? 'Da kiem tra' : 'Chua check-in'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Concessions tracking */}
+          {activeTab === 'concessions' && (
+            <div className="space-y-6">
+              <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block">Báo cáo doanh thu bắp nước</span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                {concessions.map(c => (
+                  <div key={c.id} className="bg-zinc-950 border border-zinc-850 p-5 rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{c.name}</h4>
+                      <p className="text-[11px] text-zinc-500 mt-1">{c.details}</p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-zinc-850/60 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 uppercase block font-bold">Da ban</span>
+                        <span className="text-sm font-black text-brand-yellow">{c.salesCount} phan</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-zinc-500 uppercase block font-bold">Doanh thu</span>
+                        <span className="text-sm font-black text-emerald-400">{(c.price * c.salesCount).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-zinc-950 p-6 rounded-2xl border border-zinc-850 text-right">
+                <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block mb-1">Tong doanh thu bap nuoc</span>
+                <span className="text-2xl font-black text-brand-coral">
+                  {concessions.reduce((acc, c) => acc + (c.price * c.salesCount), 0).toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Customers management */}
+          {activeTab === 'customers' && (
+            <div className="space-y-6">
+              <div className="relative w-full md:w-80 mb-4">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-500">
+                  <Search className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Tim khach hang..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-brand-coral transition-colors"
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-zinc-400">
+                  <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
+                    <tr>
+                      <th className="py-3 px-4">Ten khach hang</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Hang thanh vien</th>
+                      <th className="py-3 px-4">Diem tich luy</th>
+                      <th className="py-3 px-4">So ve da mua</th>
+                      <th className="py-3 px-4">Hanh dong</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {filteredCustomers.map(c => (
+                      <tr key={c.id}>
+                        <td className="py-3.5 px-4 font-bold text-white">{c.name}</td>
+                        <td className="py-3.5 px-4 font-mono text-zinc-300">{c.email}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                            c.tier === 'VIP' 
+                              ? 'bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20' 
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700/50'
+                          }`}>
+                            {c.tier}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-zinc-200">{c.points} diem</td>
+                        <td className="py-3.5 px-4">{c.ticketsBought} ve</td>
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => handleToggleCustomerTier(c.id)}
+                            className="text-xs font-bold text-brand-coral hover:underline focus:outline-none"
+                          >
+                            {c.tier === 'VIP' ? 'Ha xuong Standard' : 'Thang len VIP'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Payroll management view */}
+          {activeTab === 'payroll' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 text-xs font-black uppercase tracking-wider block">Bảng lương nhân sự tháng này</span>
+                <button
+                  onClick={handlePayrollApprove}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2.5 px-4 rounded-xl uppercase tracking-wider"
+                >
+                  Duyệt chi lương
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-zinc-400">
+                  <thead className="bg-zinc-950 text-zinc-500 text-xs font-black uppercase tracking-wider border-b border-zinc-800">
+                    <tr>
+                      <th className="py-3 px-4">Ten nhan vien</th>
+                      <th className="py-3 px-4">Chuc vu</th>
+                      <th className="py-3 px-4">Gio lam viec</th>
+                      <th className="py-3 px-4">Luong gio (VND)</th>
+                      <th className="py-3 px-4">He so nhan</th>
+                      <th className="py-3 px-4">Luong thuc nhan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {employees.map(emp => {
+                      const finalSalary = emp.hoursWorked * emp.hourlyWage * emp.activeMultiplier;
+                      return (
+                        <tr key={emp.id}>
+                          <td className="py-3.5 px-4 font-bold text-white">
+                            <div>{emp.name}</div>
+                            <div className="text-[10px] text-zinc-500 font-mono">{emp.email}</div>
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-zinc-200">{emp.role}</td>
+                          <td className="py-3.5 px-4">{emp.hoursWorked} gio</td>
+                          <td className="py-3.5 px-4">
+                            <input
+                              type="number"
+                              value={emp.hourlyWage}
+                              onChange={(e) => handleAdjustWage(emp.id, e.target.value)}
+                              className="w-24 bg-zinc-950 border border-zinc-800 rounded py-1 px-2 text-xs text-white focus:outline-none focus:border-brand-coral"
+                            />
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={emp.activeMultiplier}
+                              onChange={(e) => handleAdjustMultiplier(emp.id, e.target.value)}
+                              className="w-16 bg-zinc-950 border border-zinc-800 rounded py-1 px-2 text-xs text-white focus:outline-none focus:border-brand-coral"
+                            />
+                          </td>
+                          <td className="py-3.5 px-4 text-emerald-400 font-extrabold">{finalSalary.toLocaleString('vi-VN')}đ</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Operational configuration tabs */}
+          {activeTab === 'delays' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-white mb-4">Cấu hình ngưỡng trễ lịch chiếu</h3>
+              <div className="max-w-md bg-zinc-950 p-6 rounded-2xl border border-zinc-850 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-zinc-500 text-xs font-black uppercase">Thoi gian tre toi da cho phep (phut)</label>
+                  <input
+                    type="number"
+                    defaultValue={15}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-brand-coral"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-zinc-500 text-xs font-black uppercase">Tu dong dong suat chieu sau thoi gian tre</label>
+                  <select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-brand-coral">
+                    <option value="yes">Kich hoat</option>
+                    <option value="no">Vo hieu hoa</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => triggerToast('Da luu cau hinh tre lich chieu!')}
+                  className="bg-brand-coral hover:bg-opacity-95 text-white font-black text-xs py-3 px-6 rounded-xl uppercase tracking-wider"
+                >
+                  Luu cau hinh
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'pricing' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-white mb-4">Hệ số phụ thu giá vé</h3>
+              <div className="max-w-md bg-zinc-950 p-6 rounded-2xl border border-zinc-850 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-zinc-500 text-xs font-black uppercase">Phu thu suat chieu IMAX (VND)</label>
+                  <input
+                    type="number"
+                    defaultValue={50000}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-brand-coral"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-zinc-500 text-xs font-black uppercase">He so gia ve dip cuoi tuan (T6-CN)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    defaultValue={1.2}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-brand-coral"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerToast('Da luu he so phu thu gia ve!')}
+                  className="bg-brand-coral hover:bg-opacity-95 text-white font-black text-xs py-3 px-6 rounded-xl uppercase tracking-wider"
+                >
+                  Luu cau hinh
+                </button>
+              </div>
             </div>
           )}
 
         </div>
       </main>
+
+      {/* Movie add/edit modal form */}
+      {movieModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSaveMovie} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                {editingMovie ? 'Cap nhat phim' : 'Them phim moi'}
+              </h3>
+              <button type="button" onClick={() => setMovieModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Ten phim</label>
+              <input
+                type="text"
+                value={movieForm.title}
+                onChange={(e) => setMovieForm({ ...movieForm, title: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Do dai</label>
+                <input
+                  type="text"
+                  value={movieForm.duration}
+                  onChange={(e) => setMovieForm({ ...movieForm, duration: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Nam phat hanh</label>
+                <input
+                  type="number"
+                  value={movieForm.releaseYear}
+                  onChange={(e) => setMovieForm({ ...movieForm, releaseYear: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Gioi han tuoi</label>
+                <select
+                  value={movieForm.ageRating}
+                  onChange={(e) => setMovieForm({ ...movieForm, ageRating: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                >
+                  <option value="P">P</option>
+                  <option value="T13">T13</option>
+                  <option value="T16">T16</option>
+                  <option value="T18">T18</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Trang thai</label>
+                <select
+                  value={movieForm.status}
+                  onChange={(e) => setMovieForm({ ...movieForm, status: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                >
+                  <option value="NOW_SHOWING">NOW SHOWING</option>
+                  <option value="COMING_SOON">COMING SOON</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">The loai (Phan cach bang dau phay)</label>
+              <input
+                type="text"
+                value={movieForm.genres}
+                onChange={(e) => setMovieForm({ ...movieForm, genres: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Tom tat phim</label>
+              <textarea
+                value={movieForm.synopsis}
+                onChange={(e) => setMovieForm({ ...movieForm, synopsis: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white h-20 focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider pt-2"
+            >
+              Luu thong tin
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Actor add/edit modal form */}
+      {actorModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSaveActor} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                {editingActor ? 'Cap nhat dien vien' : 'Them dien vien'}
+              </h3>
+              <button type="button" onClick={() => setActorModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Ten dien vien</label>
+              <input
+                type="text"
+                value={actorForm.name}
+                onChange={(e) => setActorForm({ ...actorForm, name: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Quoc tich</label>
+              <input
+                type="text"
+                value={actorForm.nationality}
+                onChange={(e) => setActorForm({ ...actorForm, nationality: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Ngay sinh (YYYY-MM-DD)</label>
+              <input
+                type="text"
+                value={actorForm.birthdate}
+                onChange={(e) => setActorForm({ ...actorForm, birthdate: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Cac phim tham gia (Dau phay)</label>
+              <input
+                type="text"
+                value={actorForm.starredFilms}
+                onChange={(e) => setActorForm({ ...actorForm, starredFilms: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider"
+            >
+              Luu thong tin
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Showtime add modal form */}
+      {showtimeModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSaveShowtime} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Thêm suat chieu moi</h3>
+              <button type="button" onClick={() => setShowtimeModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {showtimeError && (
+              <div className="p-3.5 bg-red-950/50 border border-red-800/80 rounded-xl text-xs text-red-200 flex gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{showtimeError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Chon Phim</label>
+              <select
+                value={showtimeForm.movieId}
+                onChange={(e) => setShowtimeForm({ ...showtimeForm, movieId: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              >
+                {movies.map(m => (
+                  <option key={m.id} value={m.id}>{m.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Cum Rap</label>
+                <select
+                  value={showtimeForm.theaterId}
+                  onChange={(e) => {
+                    const tId = parseInt(e.target.value);
+                    const matchedT = theaters.find(t => t.id === tId);
+                    setShowtimeForm({ 
+                      ...showtimeForm, 
+                      theaterId: e.target.value,
+                      hallId: matchedT?.halls[0]?.id || ''
+                    });
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                >
+                  {theaters.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Phong Chieu</label>
+                <select
+                  value={showtimeForm.hallId}
+                  onChange={(e) => setShowtimeForm({ ...showtimeForm, hallId: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                >
+                  {theaters.find(t => t.id.toString() === showtimeForm.theaterId.toString())?.halls.map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Ngay chieu</label>
+                <input
+                  type="date"
+                  value={showtimeForm.date}
+                  onChange={(e) => setShowtimeForm({ ...showtimeForm, date: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-zinc-500 text-xs font-bold uppercase block">Gio chieu</label>
+                <input
+                  type="text"
+                  value={showtimeForm.time}
+                  onChange={(e) => setShowtimeForm({ ...showtimeForm, time: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 text-xs font-bold uppercase block">Gia ve niem yet (VND)</label>
+              <input
+                type="number"
+                value={showtimeForm.price}
+                onChange={(e) => setShowtimeForm({ ...showtimeForm, price: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-brand-coral"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-brand-coral hover:bg-opacity-95 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider"
+            >
+              Luu thong tin
+            </button>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }
