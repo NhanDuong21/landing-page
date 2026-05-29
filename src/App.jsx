@@ -47,13 +47,15 @@ function AppInner() {
     }
   };
 
+  const isDashboardView = ['admin', 'employee'].includes(currentView.name);
+
   return (
-    <div className="bg-brand-dark min-h-screen text-white pt-20 selection:bg-brand-coral selection:text-white">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-brand-coral selection:text-white">
       {/* Dynamic sticky header */}
-      <Header onNavigate={(viewName) => handleViewChange({ name: viewName, data: null })} />
+      {!isDashboardView && <Header onNavigate={(viewName) => handleViewChange({ name: viewName, data: null })} />}
 
       {/* Main Content Sections with State-Driven Switch Matrix */}
-      <main>
+      <main className={`flex-grow ${!isDashboardView ? 'pt-20' : ''}`}>
         {currentView.name === 'home' && (
           <>
             {/* Cinematic Hero Banner */}
@@ -121,7 +123,7 @@ function AppInner() {
       </main>
 
       {/* Sleek Dark Footer */}
-      <Footer />
+      {!isDashboardView && <Footer />}
     </div>
   );
 }
