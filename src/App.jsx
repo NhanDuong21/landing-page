@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import MovieGrid from './components/MovieGrid';
@@ -11,6 +11,8 @@ import RegisterView from './components/RegisterView';
 import AdminDashboardView from './components/AdminDashboardView';
 import EmployeeDashboardView from './components/EmployeeDashboardView';
 import CustomerProfileView from './components/CustomerProfileView';
+import GenreView from './components/GenreView';
+import FilteredMoviesView from './components/FilteredMoviesView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppInner() {
@@ -18,6 +20,73 @@ function AppInner() {
   const [pendingBooking, setPendingBooking] = useState(null);
   const [movieFilterTab, setMovieFilterTab] = useState('NOW_SHOWING');
   const { userRole, isAuthenticated } = useAuth();
+
+  const baseUrl = import.meta.env.BASE_URL || '/';
+
+  const normalizePath = (pathname) => {
+    const normalizedBase = baseUrl.replace(/\\/g, '/').replace(/^\//, '').replace(/\/$/, '');
+    const normalizedPath = pathname.replace(/\\/g, '/').replace(/^\//, '').replace(/\/$/, '');
+    if (normalizedBase && normalizedPath.startsWith(normalizedBase)) {
+      return normalizedPath.slice(normalizedBase.length).replace(/^\//, '');
+    }
+    return normalizedPath;
+  };
+
+  const routeFromPath = (pathname) => {
+    const path = normalizePath(pathname);
+    if (path === 'genre') {
+      return { name: 'genre', data: null };
+    }
+    if (path.startsWith('genre/')) {
+      const genreId = path.slice('genre/'.length);
+      return { name: 'genre-movies', data: { genreId } };
+    }
+    return { name: 'home', data: null };
+  };
+
+  useEffect(() => {
+    const route = routeFromPath(window.location.pathname);
+    if (route.name !== 'home') {
+      setCurrentView(route);
+    }
+
+    const handlePopState = () => {
+      setCurrentView(routeFromPath(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const pushUrl = (view) => {
+    let url = baseUrl;
+    if (!url.endsWith('/')) {
+      url += '/';
+    }
+
+    switch (view.name) {
+      case 'genre':
+        url += 'genre';
+        break;
+      case 'genre-movies':
+        url += `genre/${view.data?.genreId || ''}`;
+        break;
+      case 'detail':
+        url += `movie/${view.data?.movieId || ''}`;
+        break;
+      case 'login':
+        url += 'login';
+        break;
+      case 'register':
+        url += 'register';
+        break;
+      default:
+        url = baseUrl;
+        break;
+    }
+
+    window.history.pushState({ view: view.name, data: view.data }, '', url);
+  };
 
   // Scroll to top on view changes
   const handleViewChange = (newView) => {
@@ -28,9 +97,10 @@ function AppInner() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    
+
     setCurrentView(newView);
-    
+    pushUrl(newView);
+
     if (newView.name === 'home') {
       if (newView.data && newView.data.activeTab) {
         setMovieFilterTab(newView.data.activeTab);
@@ -175,6 +245,22 @@ function AppInner() {
             key={currentView.data?.initialTab || 'info'}
             initialTab={currentView.data?.initialTab || 'info'}
             onBackHome={() => handleViewChange({ name: 'home', data: null })} 
+          />
+        )}
+
+        {currentView.name === 'genre' && (
+          <GenreView
+            onSelectGenre={(genreId) => handleViewChange({ name: 'genre-movies', data: { genreId } })}
+            onBack={() => handleViewChange({ name: 'home', data: null })}
+          />
+        )}
+
+        {currentView.name === 'genre-movies' && (
+          <FilteredMoviesView
+            genreId={currentView.data?.genreId}
+            onSelectMovie={(movieId) => handleViewChange({ name: 'detail', data: { movieId } })}
+            onBuyTicket={(bookingData) => handleViewChange({ name: 'seats', data: bookingData })}
+            onBack={() => handleViewChange({ name: 'genre', data: null })}
           />
         )}
       </main>

@@ -148,7 +148,11 @@ export default function Header({ onNavigate }) {
           {activeDropdown === 'goc-dien-anh' && (
             <div className="absolute left-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
               <button
-                onClick={() => handleInfoOptionClick('Thể loại phim')}
+                onClick={() => {
+                  setActiveDropdown(null);
+                  setMobileMenuOpen(false);
+                  onNavigate('genre', null);
+                }}
                 className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
               >
                 Thể loại phim
@@ -342,7 +346,10 @@ export default function Header({ onNavigate }) {
           <div className="space-y-1 border-b border-zinc-900 pb-2">
             <span className="text-[10px] text-zinc-500 font-black tracking-wider uppercase block">Góc điện ảnh</span>
             <button
-              onClick={() => handleInfoOptionClick('Thể loại phim')}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onNavigate('genre', null);
+              }}
               className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
             >
               Thể loại phim
