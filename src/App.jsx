@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 function AppInner() {
   const [currentView, setCurrentView] = useState({ name: 'home', data: null });
   const [pendingBooking, setPendingBooking] = useState(null);
+  const [movieFilterTab, setMovieFilterTab] = useState('NOW_SHOWING');
   const { userRole, isAuthenticated } = useAuth();
 
   // Scroll to top on view changes
@@ -27,8 +28,24 @@ function AppInner() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    
     setCurrentView(newView);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    if (newView.name === 'home') {
+      if (newView.data && newView.data.activeTab) {
+        setMovieFilterTab(newView.data.activeTab);
+        setTimeout(() => {
+          const el = document.getElementById('phim');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // Implicit Authorization Guard Checks
@@ -69,7 +86,11 @@ function AppInner() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-brand-coral selection:text-white">
       {/* Dynamic sticky header */}
-      {!isDashboardView && <Header onNavigate={(viewName) => handleViewChange({ name: viewName, data: null })} />}
+      {!isDashboardView && (
+        <Header 
+          onNavigate={(viewName, viewData = null) => handleViewChange({ name: viewName, data: viewData })} 
+        />
+      )}
 
       {/* Main Content Sections with State-Driven Switch Matrix */}
       <main className={`flex-grow ${!isDashboardView ? 'pt-20' : ''}`}>
@@ -80,6 +101,8 @@ function AppInner() {
 
             {/* Featured Films Grid */}
             <MovieGrid
+              activeTab={movieFilterTab}
+              onChangeActiveTab={setMovieFilterTab}
               onSelectMovie={(movieId) => handleViewChange({ name: 'detail', data: { movieId } })}
               onBuyTicket={(bookingData) => handleViewChange({ name: 'seats', data: bookingData })}
             />
@@ -148,7 +171,11 @@ function AppInner() {
         )}
 
         {currentView.name === 'profile' && (
-          <CustomerProfileView onBackHome={() => handleViewChange({ name: 'home', data: null })} />
+          <CustomerProfileView 
+            key={currentView.data?.initialTab || 'info'}
+            initialTab={currentView.data?.initialTab || 'info'}
+            onBackHome={() => handleViewChange({ name: 'home', data: null })} 
+          />
         )}
       </main>
 

@@ -1,182 +1,240 @@
 import { useState } from 'react';
-import { Film, ChevronDown, Menu, X, Bell } from 'lucide-react';
+import { 
+  Film, ChevronDown, Menu, X, Bell, Star, Search, User, History, LogOut 
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Header({ onNavigate }) {
   const { user, userRole, isAuthenticated, logout } = useAuth();
+  
+  // Mobile drawer state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  
+  // Navigation dropdown visibility states
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'phim' | 'hoc-dien-anh' | null
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [currentLang, setCurrentLang] = useState('VIE');
+  
+  // Cinema info modal state
+  const [infoModalContent, setInfoModalContent] = useState(null);
 
   const handleLogoClick = (e) => {
     e.preventDefault();
-    onNavigate('home');
+    onNavigate('home', null);
   };
 
   const handleLogoutClick = () => {
     logout();
     setProfileDropdownOpen(false);
-    onNavigate('home');
+    onNavigate('home', null);
   };
 
-  const handleAdminViewClick = () => {
-    setProfileDropdownOpen(false);
-    if (userRole === 'ADMIN') {
-      onNavigate('admin');
-    } else if (userRole === 'EMPLOYEE') {
-      onNavigate('employee');
-    }
+  // Mua Ve ticket button click action (routes to seats with default movie payload)
+  const handleQuickTicketClick = () => {
+    const defaultBookingData = {
+      movieId: 1,
+      movieTitle: 'Tu Vu Tru John Wick: Ballerina',
+      cinema: 'Lora Nguyen Du',
+      time: '19:30',
+      format: '2D DIGITAL',
+      date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+      fullDate: new Date().toLocaleDateString('vi-VN'),
+      selectedSeats: []
+    };
+    onNavigate('seats', defaultBookingData);
   };
 
-  // Determine menu items based on role
-  let currentMenus = [
-    { name: 'Phim', href: '#phim' },
-    { name: 'Rạp', href: '#rap' },
-    { name: 'Suất chiếu', href: '#suat-chieu' }
-  ];
+  // Dropdown option handlers
+  const handlePhimOptionClick = (tab) => {
+    setActiveDropdown(null);
+    setMobileMenuOpen(false);
+    onNavigate('home', { activeTab: tab });
+  };
 
-  if (userRole === 'ADMIN') {
-    currentMenus = [
-      { name: 'Trang Chủ', action: () => onNavigate('home') },
-      { name: 'Trang Quản Trị', action: () => onNavigate('admin') }
-    ];
-  } else if (userRole === 'EMPLOYEE') {
-    currentMenus = [
-      { name: 'Trang Chủ', action: () => onNavigate('home') },
-      { name: 'Trang Nhân Viên', action: () => onNavigate('employee') }
-    ];
-  }
+  const handleInfoOptionClick = (optionName) => {
+    setActiveDropdown(null);
+    setMobileMenuOpen(false);
+    setInfoModalContent(optionName);
+  };
 
   return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-brand-dark/95 backdrop-blur-md px-6 md:px-12 py-4 flex justify-between items-center border-b border-white/5 smooth-transition">
-      {/* Left Section: Logo */}
-      <a href="/" onClick={handleLogoClick} className="flex items-center gap-2.5 group">
-        <div className="bg-brand-coral/10 p-2 rounded-xl group-hover:bg-brand-coral/20 transition-all duration-300">
-          <Film className="w-6 h-6 text-brand-coral" />
-        </div>
-        <span className="text-xl md:text-2xl font-black tracking-tight">
-          <span className="text-brand-coral">Lora</span>
-          <span className="text-white"> Film</span>
-        </span>
-      </a>
+    <header className="fixed top-0 left-0 w-full z-50 bg-zinc-950/95 backdrop-blur-md px-6 md:px-12 py-3.5 flex justify-between items-center border-b border-zinc-800/80 transition-all duration-300">
+      
+      {/* LEFT SECTION: Brand Logo & Mua Ve Coupon Stub */}
+      <div className="flex items-center gap-6">
+        {/* Brand Logo */}
+        <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 group shrink-0 select-none">
+          <div className="bg-orange-500/10 p-2 rounded-xl group-hover:bg-orange-500/20 transition-all duration-300">
+            <Film className="w-6 h-6 text-orange-500" />
+          </div>
+          <span className="text-xl font-black tracking-tight text-white uppercase">
+            Lora<span className="text-orange-500">Film</span>
+          </span>
+        </a>
 
-      {/* Center Section: Navigation Links */}
-      <nav className="hidden md:flex items-center gap-8 font-medium">
-        {currentMenus.map((item, idx) => {
-          if (item.action) {
-            return (
-              <button
-                key={idx}
-                onClick={item.action}
-                className="text-gray-400 hover:text-brand-coral transition-colors duration-300 relative py-2 group text-sm uppercase tracking-wider font-semibold focus:outline-none"
-              >
-                {item.name}
-                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-coral transition-all duration-300 group-hover:w-full"></span>
-              </button>
-            );
-          }
-          return (
-            <a
-              key={idx}
-              href={item.href}
-              className="text-gray-400 hover:text-brand-coral transition-colors duration-300 relative py-2 group text-sm uppercase tracking-wider font-semibold"
-            >
-              {item.name}
-              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-coral transition-all duration-300 group-hover:w-full"></span>
-            </a>
-          );
-        })}
-      </nav>
-
-      {/* Right Section: Language & Authentication */}
-      <div className="flex items-center gap-4 md:gap-6">
-        {/* Language Selector */}
-        <div className="relative">
+        {/* Orange Ticket Button ("Mua Vé" with custom coupon stub notch styling) */}
+        <div className="hidden sm:flex items-center shrink-0">
+          {/* Left coupon body */}
           <button
-            onClick={() => {
-              setLangDropdownOpen(!langDropdownOpen);
-              setProfileDropdownOpen(false);
-            }}
-            className="text-white flex items-center gap-2 text-sm font-semibold hover:text-brand-coral transition-colors py-1.5 px-3 rounded-lg hover:bg-white/5 focus:outline-none"
+            onClick={handleQuickTicketClick}
+            className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] font-black uppercase tracking-wider pl-4 pr-3 py-2 rounded-l-lg flex items-center gap-1.5 shadow-lg shadow-orange-500/20 h-9"
           >
-            <div className="flex items-center gap-1.5">
-              {/* Vietnam Flag Badge */}
-              <div className="w-4 h-3 flex flex-col justify-between items-center bg-red-600 rounded-[2px] relative overflow-hidden shadow-sm">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-yellow-400 clip-star" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}></div>
-                </div>
-              </div>
-              <span className="tracking-wide text-xs">{currentLang}</span>
-            </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${langDropdownOpen ? 'rotate-180' : ''}`} />
+            <Star className="w-3.5 h-3.5 fill-white text-white" />
+            <span>Mua Vé</span>
           </button>
+          
+          {/* Dashed Tear-off Line */}
+          <div className="h-9 w-[1px] border-r border-dashed border-white/40 bg-orange-500"></div>
+          
+          {/* Right notched coupon stub */}
+          <button
+            onClick={handleQuickTicketClick}
+            className="bg-orange-500 hover:bg-orange-600 transition-colors text-white w-7 h-9 rounded-r-lg relative flex items-center justify-center shadow-lg shadow-orange-500/20 shrink-0"
+          >
+            {/* Notch Cutouts */}
+            <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-zinc-950 rounded-full border border-zinc-800/80"></div>
+            <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-zinc-950 rounded-full border border-zinc-800/80"></div>
+            <div className="w-1 h-1 bg-white/70 rounded-full"></div>
+          </button>
+        </div>
+      </div>
 
-          {/* Lang Dropdown */}
-          {langDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-32 bg-brand-gray border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 py-1">
+      {/* CENTER SECTION: Structured Navigation Dropdown Menus */}
+      <nav className="hidden lg:flex items-center gap-6 font-semibold text-xs uppercase tracking-wider">
+        
+        {/* Phim Dropdown Menu */}
+        <div 
+          className="relative py-2"
+          onMouseEnter={() => setActiveDropdown('phim')}
+          onMouseLeave={() => setActiveDropdown(null)}
+        >
+          <button 
+            type="button"
+            className="text-zinc-300 hover:text-orange-500 flex items-center gap-1 transition-colors duration-250 focus:outline-none"
+          >
+            <span>Phim</span>
+            <ChevronDown className="w-3 h-3 shrink-0 text-zinc-500 group-hover:text-orange-500" />
+          </button>
+          {activeDropdown === 'phim' && (
+            <div className="absolute left-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
               <button
-                onClick={() => {
-                  setCurrentLang('VIE');
-                  setLangDropdownOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-xs text-white hover:bg-white/5 flex items-center gap-2"
+                onClick={() => handlePhimOptionClick('NOW_SHOWING')}
+                className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
               >
-                <div className="w-4 h-3 bg-red-600 rounded-[2px] relative">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-yellow-400" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}></div>
-                  </div>
-                </div>
-                Tiếng Việt
+                Phim đang chiếu
               </button>
               <button
-                onClick={() => {
-                  setCurrentLang('ENG');
-                  setLangDropdownOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-xs text-white hover:bg-white/5 flex items-center gap-2"
+                onClick={() => handlePhimOptionClick('COMING_SOON')}
+                className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
               >
-                <div className="w-4 h-3 bg-blue-900 rounded-[2px] relative overflow-hidden flex flex-col justify-between">
-                  <div className="w-full h-1 bg-red-600"></div>
-                  <div className="w-full h-1 bg-white"></div>
-                  <div className="w-full h-1 bg-blue-900"></div>
-                </div>
-                English
+                Phim sắp chiếu
               </button>
             </div>
           )}
         </div>
 
+        {/* Góc Điện Ảnh Dropdown Menu */}
+        <div 
+          className="relative py-2"
+          onMouseEnter={() => setActiveDropdown('goc-dien-anh')}
+          onMouseLeave={() => setActiveDropdown(null)}
+        >
+          <button 
+            type="button"
+            className="text-zinc-300 hover:text-orange-500 flex items-center gap-1 transition-colors duration-250 focus:outline-none"
+          >
+            <span>Góc Điện Ảnh</span>
+            <ChevronDown className="w-3 h-3 shrink-0 text-zinc-500" />
+          </button>
+          {activeDropdown === 'goc-dien-anh' && (
+            <div className="absolute left-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
+              <button
+                onClick={() => handleInfoOptionClick('Thể loại phim')}
+                className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
+              >
+                Thể loại phim
+              </button>
+              <button
+                onClick={() => handleInfoOptionClick('Diễn viên')}
+                className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
+              >
+                Diễn viên
+              </button>
+              <button
+                onClick={() => handleInfoOptionClick('Đạo diễn')}
+                className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white font-bold transition-colors"
+              >
+                Đạo diễn
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Sự Kiện Link */}
+        <button
+          onClick={() => handleInfoOptionClick('Khuyến mãi và Sự kiện')}
+          className="text-zinc-300 hover:text-orange-500 py-2 transition-colors duration-250 focus:outline-none"
+        >
+          Sự Kiện
+        </button>
+
+        {/* Rạp/Giá Vé Link */}
+        <button
+          onClick={() => handleInfoOptionClick('Rạp và Giá vé')}
+          className="text-zinc-300 hover:text-orange-500 py-2 transition-colors duration-250 focus:outline-none"
+        >
+          Rạp/Giá Vé
+        </button>
+
+        {/* Rạp Đặc Biệt Link */}
+        <button
+          onClick={() => handleInfoOptionClick('Trải nghiệm Rạp Đặc Biệt')}
+          className="text-zinc-300 hover:text-orange-500 py-2 transition-colors duration-250 focus:outline-none"
+        >
+          Rạp Đặc Biệt
+        </button>
+
+      </nav>
+
+      {/* RIGHT SECTION: Live Auth Session Status Dropdown */}
+      <div className="flex items-center gap-4">
+        {/* Search Icon button */}
+        <button 
+          onClick={() => handleInfoOptionClick('Tìm kiếm phim')}
+          className="p-2 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-all focus:outline-none"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
         {/* Auth adaptive controls */}
         {isAuthenticated ? (
-          <div className="flex items-center gap-4 relative">
-            {/* Notification Bell (Only for Customer role) */}
+          <div className="flex items-center gap-3 relative">
+            
+            {/* Notification Bell (Only for CUSTOMER role) */}
             {userRole === 'CUSTOMER' && (
-              <button className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all">
-                <Bell className="w-4.5 h-4.5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-brand-coral rounded-full"></span>
+              <button 
+                onClick={() => handleInfoOptionClick('Thông báo thành viên')}
+                className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800/80 hover:bg-zinc-800 text-zinc-450 hover:text-white transition-all focus:outline-none"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
               </button>
             )}
 
-            {/* Profile Avatar Button */}
+            {/* Profile Dropdown avatar */}
             <div className="relative">
               <button
-                onClick={() => {
-                  setProfileDropdownOpen(!profileDropdownOpen);
-                  setLangDropdownOpen(false);
-                }}
-                className="w-9 h-9 rounded-full bg-brand-coral/20 border border-brand-coral flex items-center justify-center text-brand-coral hover:bg-brand-coral/30 transition-all font-black text-sm uppercase focus:outline-none"
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="w-9 h-9 rounded-full bg-orange-500/10 border border-orange-500/40 flex items-center justify-center text-orange-500 hover:bg-orange-500/20 transition-all font-black text-sm uppercase focus:outline-none"
               >
                 {user?.fullName ? user.fullName.charAt(0) : 'U'}
               </button>
 
-              {/* Profile Dropdown */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-brand-gray border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
-                  <div className="px-4 py-2 border-b border-white/5 mb-1">
+                <div className="absolute right-0 mt-3 w-56 bg-zinc-900 border border-zinc-850 rounded-2xl overflow-hidden shadow-2xl z-50 py-2">
+                  <div className="px-4 py-2 border-b border-zinc-800 mb-1">
                     <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">Tài khoản</p>
                     <p className="text-sm font-bold text-white truncate">{user?.fullName}</p>
-                    <p className="text-[10px] text-brand-coral font-semibold uppercase">{userRole}</p>
+                    <p className="text-[10px] text-orange-500 font-semibold uppercase">{userRole}</p>
                   </div>
 
                   {userRole === 'CUSTOMER' ? (
@@ -184,91 +242,189 @@ export default function Header({ onNavigate }) {
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          onNavigate('profile');
+                          onNavigate('profile', { initialTab: 'info' });
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
+                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-2"
                       >
-                        Hồ sơ cá nhân
+                        <User className="w-3.5 h-3.5 text-zinc-500" />
+                        <span>Hồ sơ cá nhân</span>
                       </button>
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
-                          onNavigate('profile');
+                          onNavigate('profile', { initialTab: 'history' });
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-white/5 hover:text-white"
+                        className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-2"
                       >
-                        Lịch sử đặt vé
+                        <History className="w-3.5 h-3.5 text-zinc-500" />
+                        <span>Lịch sử đặt vé</span>
                       </button>
                     </>
                   ) : (
                     <button
-                      onClick={handleAdminViewClick}
-                      className="w-full text-left px-4 py-2.5 text-xs text-brand-yellow hover:bg-white/5 hover:text-white font-bold"
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        if (userRole === 'ADMIN') onNavigate('admin', null);
+                        if (userRole === 'EMPLOYEE') onNavigate('employee', null);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-orange-500 hover:bg-zinc-800 font-bold flex items-center gap-2"
                     >
-                      {userRole === 'ADMIN' ? 'Vào Trang Quản Trị' : 'Vào Trang Nhân Viên'}
+                      <span>Vào trang quản lý</span>
                     </button>
                   )}
 
                   <button
                     onClick={handleLogoutClick}
-                    className="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-red-950/20 hover:text-red-300 font-bold border-t border-white/5 mt-1"
+                    className="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-red-950/20 hover:text-red-300 font-bold border-t border-zinc-800 mt-1 flex items-center gap-2"
                   >
-                    Đăng xuất
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Đăng xuất</span>
                   </button>
                 </div>
               )}
+
             </div>
+
           </div>
         ) : (
           <button
-            onClick={() => onNavigate('login')}
-            className="bg-brand-coral hover:bg-opacity-90 text-white text-xs font-black py-2.5 px-5 rounded-full transition-all duration-300 shadow-lg shadow-brand-coral/20 uppercase tracking-wider"
+            onClick={() => onNavigate('login', null)}
+            className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-black py-2.5 px-5 rounded-full transition-all duration-300 shadow-lg shadow-orange-500/10 uppercase tracking-wider focus:outline-none"
           >
             Đăng Nhập
           </button>
         )}
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu trigger */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden flex items-center justify-center p-2 text-gray-400 hover:text-white"
-          aria-label="Toggle Menu"
+          className="lg:hidden flex items-center justify-center p-2 text-zinc-400 hover:text-white focus:outline-none"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
+
       </div>
 
-      {/* Mobile Drawer */}
+      {/* MOBILE DRAWERS */}
       {mobileMenuOpen && (
-        <div className="absolute top-[73px] left-0 w-full bg-brand-dark/95 border-b border-white/10 px-6 py-6 flex flex-col gap-4 md:hidden z-40 animate-in slide-in-from-top duration-300">
-          {currentMenus.map((item, idx) => {
-            if (item.action) {
-              return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    item.action();
-                  }}
-                  className="text-left text-gray-300 hover:text-brand-coral py-2 text-base font-semibold border-b border-white/5 w-full uppercase"
-                >
-                  {item.name}
-                </button>
-              );
-            }
-            return (
-              <a
-                key={idx}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-300 hover:text-brand-coral py-2 text-base font-semibold border-b border-white/5 uppercase"
-              >
-                {item.name}
-              </a>
-            );
-          })}
+        <div className="absolute top-[65px] left-0 w-full bg-zinc-950 border-b border-zinc-800 px-6 py-6 flex flex-col gap-4 lg:hidden z-40 animate-in slide-in-from-top duration-300">
+          
+          {/* Mua Ve Link for Mobile */}
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              handleQuickTicketClick();
+            }}
+            className="w-full bg-orange-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2"
+          >
+            <Star className="w-4 h-4 fill-white text-white" />
+            <span>Mua Vé Nhanh</span>
+          </button>
+
+          {/* Phim Section */}
+          <div className="space-y-1 border-b border-zinc-900 pb-2">
+            <span className="text-[10px] text-zinc-500 font-black tracking-wider uppercase block">Phim</span>
+            <button
+              onClick={() => handlePhimOptionClick('NOW_SHOWING')}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
+            >
+              Phim đang chiếu
+            </button>
+            <button
+              onClick={() => handlePhimOptionClick('COMING_SOON')}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
+            >
+              Phim sắp chiếu
+            </button>
+          </div>
+
+          {/* Góc Điện Ảnh Section */}
+          <div className="space-y-1 border-b border-zinc-900 pb-2">
+            <span className="text-[10px] text-zinc-500 font-black tracking-wider uppercase block">Góc điện ảnh</span>
+            <button
+              onClick={() => handleInfoOptionClick('Thể loại phim')}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
+            >
+              Thể loại phim
+            </button>
+            <button
+              onClick={() => handleInfoOptionClick('Diễn viên')}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
+            >
+              Diễn viên
+            </button>
+            <button
+              onClick={() => handleInfoOptionClick('Đạo diễn')}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 py-1.5 text-xs font-bold uppercase"
+            >
+              Đạo diễn
+            </button>
+          </div>
+
+          {/* Other links */}
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={() => { setMobileMenuOpen(false); handleInfoOptionClick('Khuyến mãi và Sự kiện'); }}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 text-xs font-bold uppercase"
+            >
+              Sự Kiện
+            </button>
+            <button
+              onClick={() => { setMobileMenuOpen(false); handleInfoOptionClick('Rạp và Giá vé'); }}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 text-xs font-bold uppercase"
+            >
+              Rạp/Giá Vé
+            </button>
+            <button
+              onClick={() => { setMobileMenuOpen(false); handleInfoOptionClick('Trải nghiệm Rạp Đặc Biệt'); }}
+              className="w-full text-left text-zinc-200 hover:text-orange-500 text-xs font-bold uppercase"
+            >
+              Rạp Đặc Biệt
+            </button>
+          </div>
+
         </div>
       )}
+
+      {/* GALAXY INFO CONTENT DISPLAY OVERLAY MODAL */}
+      {infoModalContent && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6">
+            <div>
+              <h3 className="text-base font-black text-white uppercase tracking-wider">{infoModalContent}</h3>
+              <p className="text-zinc-500 text-[10px] mt-0.5">Hệ thống thông tin giải trí LoraFilm</p>
+            </div>
+            
+            <div className="text-xs text-zinc-300 leading-relaxed py-4 border-y border-zinc-800">
+              {infoModalContent === 'Tìm kiếm phim' ? (
+                <div className="space-y-4">
+                  <p>Nhập tên phim bạn muốn tìm kiếm:</p>
+                  <input 
+                    type="text" 
+                    placeholder="Tìm tên phim, diễn viên..." 
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-xs text-white focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <p>
+                  Thông tin mục **{infoModalContent}** đang được đồng bộ và cập nhật tự động từ ban quản lý rạp. Vui lòng quay lại sau!
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInfoModalContent(null)}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-black py-2.5 px-6 rounded-xl text-xs uppercase tracking-wider transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </header>
   );
 }

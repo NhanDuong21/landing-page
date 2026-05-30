@@ -5,11 +5,11 @@ import {
   PhoneCall, HelpCircle, History, Bell, Gift, FileText, CheckCircle, AlertCircle 
 } from 'lucide-react';
 
-export default function CustomerProfileView({ onBackHome }) {
+export default function CustomerProfileView({ onBackHome, initialTab = 'info' }) {
   const { user, updateUser } = useAuth();
 
   // Local state for tabs: 'info', 'history', 'notifications', 'gifts', 'policy'
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Load user data fields (Name, Birthday, Gender are strictly read-only disabled)
   const fullName = user?.fullName || 'Nguyễn Khách Hàng';

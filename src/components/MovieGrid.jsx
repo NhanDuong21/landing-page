@@ -3,8 +3,10 @@ import { Star, Clock } from 'lucide-react';
 import { MOVIES } from '../data/mockData';
 import TrailerModal from './TrailerModal';
 
-export default function MovieGrid({ onSelectMovie, onBuyTicket }) {
-  const [activeTab, setActiveTab] = useState('NOW_SHOWING');
+export default function MovieGrid({ onSelectMovie, onBuyTicket, activeTab: propActiveTab, onChangeActiveTab }) {
+  const [localActiveTab, setLocalActiveTab] = useState('NOW_SHOWING');
+  const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
+  const setActiveTab = onChangeActiveTab !== undefined ? onChangeActiveTab : setLocalActiveTab;
   const [visibleCount, setVisibleCount] = useState(8);
   const [activeTrailerId, setActiveTrailerId] = useState(null);
 
